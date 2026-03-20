@@ -1,6 +1,0 @@
-[build]
-  command = "npm install && npm run build:frontend"
-  publish = "dist/temp/browser"
-
-[build.environment]
-  NODE_VERSION = "20"
