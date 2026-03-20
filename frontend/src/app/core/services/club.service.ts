@@ -39,4 +39,8 @@ export class ClubService {
             this.myClubIds.set(clubs.map(c => c.id));
         });
     }
+
+    getMyClubs() {
+        return this.http.get<Club[]>(`${environment.apiUrl}/clubs/owned`);
+    }
 }

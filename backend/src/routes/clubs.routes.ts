@@ -33,6 +33,29 @@ router.get('/mine', requireAuth, async (req: AuthRequest, res: Response) => {
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
+// Clubs that organiser owns
+router.get('/owned', requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    const result = await pool.query(`
+      SELECT c.*,
+        (SELECT COUNT(*) FROM club_members cm WHERE cm.club_id = c.id)::int AS member_count,
+        (SELECT MIN(r.event_date)
+         FROM run_events r
+         WHERE r.club_id = c.id
+           AND r.status = 'active'
+           AND r.event_date > NOW()) AS next_run_date
+      FROM clubs c
+      WHERE c.owner_id = $1
+      ORDER BY c.created_at DESC
+    `, [req.user!.id]);
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // Create club
 router.post('/', requireAuth, async (req: AuthRequest, res: Response) => {
   const { name, description, city, pace, tags } = req.body;
