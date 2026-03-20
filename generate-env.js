@@ -1,6 +1,11 @@
 const fs = require('fs');
 const path = require('path');
-require('dotenv').config({ path: path.resolve(__dirname, '.env') });
+
+try {
+  require('dotenv').config({ path: path.resolve(__dirname, '.env') });
+} catch (_) {
+  // Netlify/build environments can provide vars directly without dotenv installed
+}
 
 const apiUrl = process.env.FRONTEND_API_URL || 'http://localhost:3000/api';
 const googleMapsApiKey = process.env.GOOGLE_MAPS_API_KEY || '';
