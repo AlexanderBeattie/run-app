@@ -93,12 +93,91 @@ router.get('/:id/attendees', async (req: Request, res: Response) => {
 });
 
 router.post('/', requireAuth, async (req: AuthRequest, res: Response) => {
-  const { clubId, clubName, title, startLocation, endLocation, startAddress, endAddress, date, distanceKm, estimatedMinutes, maxAttendees, notes, pace, tags } = req.body;
+  const {
+    clubId,
+    title,
+    startLocation,
+    endLocation,
+    startAddress,
+    endAddress,
+    date,
+    distanceKm,
+    estimatedMinutes,
+    maxAttendees,
+    notes,
+    pace,
+    tags
+  } = req.body;
+
   try {
-    const result = await pool.query(`INSERT INTO run_events (club_id, club_name, title, start_lat, start_lng, end_lat, end_lng, start_address, end_address, event_date, distance_km, estimated_minutes, max_attendees, notes, pace, tags, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) RETURNING *`,
-      [clubId ?? null, clubName, title, startLocation.lat, startLocation.lng, endLocation.lat, endLocation.lng, startAddress, endAddress, date, distanceKm, estimatedMinutes, maxAttendees ?? null, notes ?? null, pace ?? null, tags ?? [], req.user!.id]);
+    let resolvedClubId: string | null = null;
+    let resolvedClubName = 'Independent Run';
+
+    if (clubId) {
+      const clubCheck = await pool.query(
+        `
+        SELECT c.id, c.name
+        FROM clubs c
+        LEFT JOIN club_members cm
+          ON cm.club_id = c.id AND cm.user_id = $2
+        WHERE c.id = $1
+          AND (
+            c.owner_id = $2
+            OR cm.role IN ('owner', 'organizer')
+          )
+        `,
+        [clubId, req.user!.id]
+      );
+
+      if (!clubCheck.rows.length) {
+        res.status(403).json({ error: 'Not allowed to create runs for this club' });
+        return;
+      }
+
+      resolvedClubId = clubCheck.rows[0].id;
+      resolvedClubName = clubCheck.rows[0].name;
+    }
+
+    const result = await pool.query(
+      `
+      INSERT INTO run_events (
+        club_id, club_name, title,
+        start_lat, start_lng, end_lat, end_lng,
+        start_address, end_address, event_date,
+        distance_km, estimated_minutes, max_attendees,
+        notes, pace, tags, created_by
+      )
+      VALUES (
+        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17
+      )
+      RETURNING *
+      `,
+      [
+        resolvedClubId,
+        resolvedClubName,
+        title,
+        startLocation.lat,
+        startLocation.lng,
+        endLocation.lat,
+        endLocation.lng,
+        startAddress,
+        endAddress,
+        date,
+        distanceKm,
+        estimatedMinutes,
+        maxAttendees ?? null,
+        notes ?? null,
+        pace ?? null,
+        tags ?? [],
+        req.user!.id
+      ]
+    );
+
     res.status(201).json(result.rows[0]);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
 });
 
 router.patch('/:id', requireAuth, async (req: AuthRequest, res: Response) => {
