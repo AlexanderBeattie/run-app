@@ -1,0 +1,12 @@
+@use 'styles/klub-theme' as t;
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  height: 100%; font-family: t.$font-sans; font-size: 16px;
+  color: t.$klub-black; background: t.$klub-surface;
+  -webkit-font-smoothing: antialiased; overscroll-behavior: none;
+}
+a { color: inherit; text-decoration: none; }
+input, textarea, select { font-family: t.$font-sans; font-size: 16px; }
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 2px; }
+.pac-container { z-index: 9999 !important; }

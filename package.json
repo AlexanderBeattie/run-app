@@ -1,0 +1,29 @@
+{
+  "name": "klub",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "overrides": {
+    "rxjs": "~7.8.0"
+  },
+  "scripts": {
+    "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\"",
+    "dev:frontend": "node generate-env.js && npm run start --workspace=frontend",
+    "dev:backend": "npm run dev --workspace=backend",
+    "build:frontend": "node generate-env.js && npm run build --workspace=frontend",
+    "build:backend": "npm run build --workspace=backend",
+    "start:frontend": "npm run start --workspace=frontend",
+    "start:backend": "npm run start --workspace=backend",
+    "test:backend": "npm run test --workspace=backend",
+    "test:frontend": "npm run test --workspace=frontend",
+    "test": "concurrently \"npm run test:frontend\" \"npm run test:backend\""
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.0",
+    "dotenv": "^16.0.3",
+    "typescript": "5.4.5"
+  }
+}
