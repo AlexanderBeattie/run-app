@@ -7,6 +7,7 @@ export interface RunEvent {
   date: Date; distanceKm: number; estimatedMinutes: number;
   attendees: string[]; maxAttendees?: number; notes?: string;
   status?: string; createdBy?: string;
+  pace?: string; tags?: string[];
 }
 export interface KlubUser {
   id: string; displayName: string; email: string;
@@ -19,4 +20,16 @@ export interface CreateRunPayload {
   startAddress: string; endAddress: string;
   date: any; distanceKm: number; estimatedMinutes: number;
   maxAttendees?: number; notes?: string;
+  pace?: string; tags?: string[];
+}
+export interface Club {
+  id: string; name: string; description: string;
+  owner_id: string; city?: string; pace?: string;
+  tags?: string[]; logo_url?: string;
+  member_count: number; active_run_count?: number;
+  next_run_date?: string; created_at: string;
+}
+export interface ClubMember {
+  id: string; display_name: string;
+  role: string; joined_at: string;
 }

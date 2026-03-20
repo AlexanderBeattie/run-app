@@ -11,7 +11,8 @@ const mockRunData = {
   event_date: new Date(Date.now() + 86400000).toISOString(),
   distance_km: '5.5', estimated_minutes: 30,
   attendees: ['user-1', 'user-2'], max_attendees: 20,
-  notes: 'Test notes', status: 'active', created_by: 'user-1'
+  notes: 'Test notes', status: 'active', created_by: 'user-1',
+  pace: 'moderate', tags: ['road']
 };
 
 describe('RunsService', () => {
@@ -19,6 +20,7 @@ describe('RunsService', () => {
   let http: HttpTestingController;
 
   beforeEach(() => {
+    TestBed.resetTestingModule();
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(),
@@ -48,7 +50,7 @@ describe('RunsService', () => {
 
   it('loadRuns fetches and maps runs correctly', () => {
     service.loadRuns();
-    const req = http.expectOne(`${environment.apiUrl}/runs`);
+    const req = http.expectOne(r => r.url.includes('/runs'));
     expect(req.request.method).toBe('GET');
     req.flush([mockRunData]);
     const runs = service.getRuns()();
@@ -57,6 +59,21 @@ describe('RunsService', () => {
     expect(runs[0].distanceKm).toBe(5.5);
     expect(runs[0].startLocation).toEqual({ lat: 51.5, lng: -0.1 });
     expect(runs[0].attendees).toEqual(['user-1', 'user-2']);
+    expect(runs[0].pace).toBe('moderate');
+    expect(runs[0].tags).toEqual(['road']);
+  });
+
+  it('loadRuns sends query params when provided', () => {
+    service.loadRuns({ search: 'parkrun', distance_min: 5 });
+    const req = http.expectOne(r => r.url.includes('/runs') && r.params.get('search') === 'parkrun');
+    expect(req.request.params.get('distance_min')).toBe('5');
+    req.flush([]);
+  });
+
+  it('loadRuns sends date filter param', () => {
+    service.loadRuns({ date: 'today' });
+    const req = http.expectOne(r => r.params.get('date') === 'today');
+    req.flush([]);
   });
 
   it('selectRun updates selectedRunId', () => {
@@ -90,7 +107,7 @@ describe('RunsService', () => {
       date: new Date().toISOString(), distanceKm: 5, estimatedMinutes: 30
     };
     service.createRun(payload).subscribe();
-    const req = http.expectOne(`${environment.apiUrl}/runs`);
+    const req = http.expectOne(r => r.url.includes('/runs') && r.method === 'POST');
     expect(req.request.method).toBe('POST');
     req.flush(mockRunData);
   });

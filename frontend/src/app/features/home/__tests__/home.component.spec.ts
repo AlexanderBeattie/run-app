@@ -6,6 +6,7 @@ import { signal } from '@angular/core';
 import { HomeComponent } from '../home.component';
 import { RunsService } from '../../../core/services/runs.service';
 import { AuthService } from '../../../core/services/auth.service';
+import { ToastService } from '../../../shared/services/toast.service';
 import { RunEvent } from '../../../core/models/run-event.model';
 
 const makeRun = (overrides: Partial<RunEvent> = {}): RunEvent => ({
@@ -35,6 +36,7 @@ describe('HomeComponent', () => {
       isLoggedIn: jest.fn().mockReturnValue(true)
     };
 
+    TestBed.resetTestingModule();
     await TestBed.configureTestingModule({
       imports: [HomeComponent],
       providers: [
@@ -42,7 +44,8 @@ describe('HomeComponent', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         { provide: RunsService, useValue: runsService },
-        { provide: AuthService, useValue: authService }
+        { provide: AuthService, useValue: authService },
+        ToastService
       ]
     }).compileComponents();
 
@@ -64,38 +67,42 @@ describe('HomeComponent', () => {
     expect(component.initials).toBe('A');
   });
 
-  it('returns all runs when filter is All runs', () => {
+  it('displays runs from service', () => {
     const runs = [makeRun({ distanceKm: 3 }), makeRun({ id: 'run-2', distanceKm: 8 })];
     runsService.getRuns.mockReturnValue(signal(runs));
-    component.activeFilter = 'All runs';
-    expect(component.filteredRuns.length).toBe(2);
+    expect(runsService.getRuns()().length).toBe(2);
   });
 
-  it('filters to 5k+ runs correctly', () => {
-    const runs = [makeRun({ distanceKm: 3 }), makeRun({ id: 'run-2', distanceKm: 5 }), makeRun({ id: 'run-3', distanceKm: 10 })];
-    runsService.getRuns.mockReturnValue(signal(runs));
-    component.activeFilter = '5k+';
-    expect(component.filteredRuns.length).toBe(2);
+  it('calls loadRuns with filter params when setFilter is called', () => {
+    component.setFilter({ label: '5k+', params: { distance_min: 5 } });
+    expect(runsService.loadRuns).toHaveBeenCalledWith(expect.objectContaining({ distance_min: 5 }));
+    expect(component.activeFilter).toBe('5k+');
   });
 
-  it('filters to 10k+ runs correctly', () => {
-    const runs = [makeRun({ distanceKm: 5 }), makeRun({ id: 'run-2', distanceKm: 10 }), makeRun({ id: 'run-3', distanceKm: 12 })];
-    runsService.getRuns.mockReturnValue(signal(runs));
-    component.activeFilter = '10k+';
-    expect(component.filteredRuns.length).toBe(2);
+  it('calls loadRuns with date param for Today filter', () => {
+    component.setFilter({ label: 'Today', params: { date: 'today' } });
+    expect(runsService.loadRuns).toHaveBeenCalledWith(expect.objectContaining({ date: 'today' }));
   });
 
-  it('filters to Today runs only', () => {
-    const todayRun = makeRun({ date: new Date() });
-    const tomorrowRun = makeRun({ id: 'run-2', date: new Date(Date.now() + 86400000) });
-    runsService.getRuns.mockReturnValue(signal([todayRun, tomorrowRun]));
-    component.activeFilter = 'Today';
-    expect(component.filteredRuns.length).toBe(1);
+  it('calls loadRuns with date param for This week filter', () => {
+    component.setFilter({ label: 'This week', params: { date: 'week' } });
+    expect(runsService.loadRuns).toHaveBeenCalledWith(expect.objectContaining({ date: 'week' }));
+  });
+
+  it('calls loadRuns with distance_min for 10k+ filter', () => {
+    component.setFilter({ label: '10k+', params: { distance_min: 10 } });
+    expect(runsService.loadRuns).toHaveBeenCalledWith(expect.objectContaining({ distance_min: 10 }));
+  });
+
+  it('includes search query when setting filter', () => {
+    component.searchQuery = 'parkrun';
+    component.setFilter({ label: 'Today', params: { date: 'today' } });
+    expect(runsService.loadRuns).toHaveBeenCalledWith(expect.objectContaining({ date: 'today', search: 'parkrun' }));
   });
 
   it('sets loaded to true after timeout', async () => {
     expect(component.loaded).toBe(false);
-    await new Promise(r => setTimeout(r, 900));
+    await new Promise(r => setTimeout(r, 700));
     expect(component.loaded).toBe(true);
   });
 });

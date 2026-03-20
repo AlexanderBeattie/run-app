@@ -1,0 +1,187 @@
+import { Component, inject, OnInit, ChangeDetectorRef } from '@angular/core';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { ClubService } from '../../core/services/club.service';
+import { AuthService } from '../../core/services/auth.service';
+import { RunsService } from '../../core/services/runs.service';
+import { ToastService } from '../../shared/services/toast.service';
+import { RunCardComponent } from '../../shared/components/run-card/run-card.component';
+import { RunDetailDialogComponent } from '../../shared/components/run-detail-dialog/run-detail-dialog.component';
+import { Club, ClubMember, RunEvent } from '../../core/models/run-event.model';
+import { signal } from '@angular/core';
+
+@Component({
+    selector: 'app-club-profile',
+    standalone: true,
+    imports: [RouterLink, RunCardComponent, RunDetailDialogComponent],
+    template: `
+    <div class="page">
+      @if (!club) {
+        <div class="loading-page"><div class="spinner"></div></div>
+      } @else {
+        <div class="header">
+          <button class="back" (click)="router.navigate(['/clubs'])">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+          </button>
+          <div class="club-avatar">{{ club.name[0]?.toUpperCase() }}</div>
+          <div class="club-name">{{ club.name }}</div>
+          @if (club.city) { <div class="club-city">{{ club.city }}</div> }
+          @if (club.description) { <div class="club-desc">{{ club.description }}</div> }
+          <div class="club-stats">
+            <div class="stat"><div class="sv">{{ club.member_count }}</div><div class="sl">members</div></div>
+            <div class="stat"><div class="sv">{{ club.active_run_count ?? 0 }}</div><div class="sl">active runs</div></div>
+          </div>
+          <div class="tag-row">
+            @if (club.pace) { <span class="tag pace">{{ club.pace }}</span> }
+            @for (t of club.tags ?? []; track t) { <span class="tag">{{ t }}</span> }
+          </div>
+          @if (!isOwner) {
+            <button class="join-btn" [class.joined]="isMember" (click)="toggleJoin()">
+              {{ isMember ? 'Leave club' : 'Join club' }}
+            </button>
+          } @else {
+            <div class="owner-badge">You own this club</div>
+          }
+        </div>
+
+        <div class="content">
+          <div class="section-title">Upcoming runs ({{ runs.length }})</div>
+          @if (runs.length === 0) {
+            <div class="empty">No upcoming runs.</div>
+          } @else {
+            <div class="run-list">
+              @for (run of runs; track run.id) {
+                <app-run-card
+                  [run]="mapRun(run)"
+                  [isJoined]="runsService.getJoinedRunIds()().includes(run.id)"
+                  (cardClick)="selectedRun.set(mapRun(run))"
+                  (joinToggle)="onJoinRun($event)" />
+              }
+            </div>
+          }
+
+          <div class="section-title">Members ({{ members.length }})</div>
+          @if (members.length === 0) {
+            <div class="empty">No members yet.</div>
+          } @else {
+            <div class="member-list">
+              @for (m of members; track m.id) {
+                <div class="member-row">
+                  <div class="member-av">{{ m.display_name[0]?.toUpperCase() }}</div>
+                  <div class="member-info">
+                    <span class="member-name">{{ m.display_name }}</span>
+                    @if (m.role === 'owner') { <span class="role-badge">Owner</span> }
+                  </div>
+                </div>
+              }
+            </div>
+          }
+        </div>
+      }
+    </div>
+
+    @if (selectedRun()) {
+      <app-run-detail-dialog
+        [run]="selectedRun()!"
+        [isJoined]="runsService.getJoinedRunIds()().includes(selectedRun()!.id)"
+        (close)="selectedRun.set(null)"
+        (join)="onJoinRun($event)" />
+    }
+  `,
+    styles: [`
+    .page { background: #F7F7F5; min-height: 100%; }
+    .loading-page { display: flex; align-items: center; justify-content: center; min-height: 60vh; }
+    .spinner { width: 32px; height: 32px; border: 3px solid rgba(0,0,0,0.1); border-top-color: #1D9E75; border-radius: 50%; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .header { background: #0D0D0D; padding: 16px 20px 24px; display: flex; flex-direction: column; align-items: center; text-align: center; position: relative; }
+    .back { position: absolute; top: 16px; left: 16px; background: none; border: none; color: rgba(255,255,255,0.7); cursor: pointer; display: flex; padding: 4px; }
+    .club-avatar { width: 64px; height: 64px; border-radius: 16px; background: #E1F5EE; display: flex; align-items: center; justify-content: center; font-size: 26px; font-weight: 600; color: #0F6E56; margin-bottom: 12px; }
+    .club-name { font-size: 22px; font-weight: 500; color: #fff; margin-bottom: 4px; }
+    .club-city { font-size: 13px; color: rgba(255,255,255,0.5); margin-bottom: 8px; }
+    .club-desc { font-size: 14px; color: rgba(255,255,255,0.6); line-height: 1.5; margin-bottom: 16px; max-width: 340px; }
+    .club-stats { display: flex; gap: 24px; margin-bottom: 14px; }
+    .stat { text-align: center; }
+    .sv { font-size: 20px; font-weight: 500; color: #fff; }
+    .sl { font-size: 11px; color: rgba(255,255,255,0.4); margin-top: 2px; }
+    .tag-row { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; margin-bottom: 16px; }
+    .tag { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.7); border-radius: 999px; padding: 4px 12px; font-size: 12px; font-weight: 500; }
+    .tag.pace { background: rgba(29,158,117,0.25); color: #1D9E75; }
+    .join-btn { width: 100%; max-width: 300px; background: #1D9E75; color: #E1F5EE; border: none; border-radius: 12px; padding: 14px; font-size: 15px; font-weight: 500; cursor: pointer; font-family: inherit; }
+    .join-btn.joined { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.6); }
+    .owner-badge { font-size: 13px; color: rgba(255,255,255,0.4); background: rgba(255,255,255,0.08); border-radius: 8px; padding: 8px 16px; }
+    .content { padding: 20px 12px 24px; }
+    .section-title { font-size: 11px; font-weight: 500; color: #9B9B98; text-transform: uppercase; letter-spacing: 0.06em; padding: 0 4px; margin-bottom: 12px; }
+    .empty { text-align: center; padding: 24px 20px; font-size: 14px; color: #9B9B98; margin-bottom: 20px; }
+    .run-list { display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px; }
+    .member-list { display: flex; flex-direction: column; gap: 2px; }
+    .member-row { display: flex; align-items: center; gap: 12px; padding: 10px 8px; border-radius: 10px; }
+    .member-row:hover { background: #fff; }
+    .member-av { width: 32px; height: 32px; border-radius: 50%; background: #E1F5EE; color: #0F6E56; font-size: 13px; font-weight: 500; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .member-info { display: flex; align-items: center; gap: 8px; }
+    .member-name { font-size: 14px; color: #0D0D0D; }
+    .role-badge { font-size: 10px; font-weight: 500; color: #1D9E75; background: #E1F5EE; padding: 2px 8px; border-radius: 999px; }
+  `]
+})
+export class ClubProfileComponent implements OnInit {
+    route = inject(ActivatedRoute);
+    router = inject(Router);
+    clubService = inject(ClubService);
+    runsService = inject(RunsService);
+    auth = inject(AuthService);
+    toast = inject(ToastService);
+    cdr = inject(ChangeDetectorRef);
+
+    club: Club | null = null;
+    members: ClubMember[] = [];
+    runs: any[] = [];
+    isMember = false;
+    selectedRun = signal<RunEvent | null>(null);
+
+    get isOwner() { return this.club?.owner_id === this.auth.getUser()()?.id; }
+
+    ngOnInit() {
+        const id = this.route.snapshot.paramMap.get('id') ?? '';
+        this.clubService.getClub(id).subscribe(c => {
+            this.club = c;
+            this.cdr.markForCheck();
+        });
+        this.clubService.getClubMembers(id).subscribe(m => {
+            this.members = m;
+            this.isMember = m.some(member => member.id === this.auth.getUser()()?.id);
+            this.cdr.markForCheck();
+        });
+        this.clubService.getClubRuns(id).subscribe(r => {
+            this.runs = r;
+            this.cdr.markForCheck();
+        });
+    }
+
+    toggleJoin() {
+        if (!this.club) return;
+        this.clubService.toggleJoin(this.club.id);
+        this.isMember = !this.isMember;
+        if (this.club) {
+            this.club = { ...this.club, member_count: this.club.member_count + (this.isMember ? 1 : -1) };
+        }
+        this.toast.show(this.isMember ? 'Joined club!' : 'Left club');
+        this.cdr.markForCheck();
+    }
+
+    mapRun(r: any): RunEvent {
+        return {
+            id: r.id, clubId: r.club_id, clubName: r.club_name, title: r.title,
+            startLocation: { lat: parseFloat(r.start_lat), lng: parseFloat(r.start_lng) },
+            endLocation: { lat: parseFloat(r.end_lat), lng: parseFloat(r.end_lng) },
+            startAddress: r.start_address, endAddress: r.end_address,
+            date: new Date(r.event_date), distanceKm: parseFloat(r.distance_km),
+            estimatedMinutes: r.estimated_minutes, attendees: r.attendees ?? [],
+            maxAttendees: r.max_attendees, notes: r.notes,
+            status: r.status, createdBy: r.created_by,
+            pace: r.pace, tags: r.tags
+        };
+    }
+
+    onJoinRun(runId: string) {
+        this.runsService.toggleJoin(runId, this.auth.getUser()()?.id ?? 'guest');
+        this.toast.show('Run updated!');
+    }
+}

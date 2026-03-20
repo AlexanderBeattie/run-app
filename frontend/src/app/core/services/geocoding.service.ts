@@ -1,16 +1,21 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
+import { firstValueFrom } from 'rxjs';
 
 @Injectable({ providedIn: 'root' })
 export class GeocodingService {
+  private http = inject(HttpClient);
+
   async geocode(address: string): Promise<{ lat: number; lng: number } | null> {
-    const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${environment.googleMapsApiKey}`;
     try {
-      const res = await fetch(url);
-      const data = await res.json();
-      if (data.status === 'OK' && data.results.length > 0) {
-        const { lat, lng } = data.results[0].geometry.location;
-        return { lat, lng };
+      const result = await firstValueFrom(
+        this.http.get<{ lat: number | null; lng: number | null }>(`${environment.apiUrl}/geocode`, {
+          params: { address }
+        })
+      );
+      if (result.lat !== null && result.lng !== null) {
+        return { lat: result.lat, lng: result.lng };
       }
       return null;
     } catch { return null; }

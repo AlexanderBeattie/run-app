@@ -1,15 +1,18 @@
 import { Component, inject, OnInit, ChangeDetectorRef, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { RunsService } from '../../core/services/runs.service';
 import { AuthService } from '../../core/services/auth.service';
+import { ToastService } from '../../shared/services/toast.service';
 import { RunCardComponent } from '../../shared/components/run-card/run-card.component';
 import { RunDetailDialogComponent } from '../../shared/components/run-detail-dialog/run-detail-dialog.component';
 import { RunEvent } from '../../core/models/run-event.model';
+import { Subject, debounceTime, distinctUntilChanged } from 'rxjs';
 
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [RunCardComponent, RunDetailDialogComponent, RouterLink],
+  imports: [RunCardComponent, RunDetailDialogComponent, RouterLink, FormsModule],
   template: `
     <div class="page">
       <div class="header">
@@ -25,13 +28,13 @@ import { RunEvent } from '../../core/models/run-event.model';
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="2.5">
             <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
           </svg>
-          <span>Find runs near you...</span>
+          <input type="text" [(ngModel)]="searchQuery" (ngModelChange)="onSearchChange($event)" placeholder="Find runs near you..." />
         </div>
       </div>
 
       <div class="filter-row">
-        @for (f of filters; track f) {
-          <button class="chip" [class.active]="activeFilter === f" (click)="activeFilter = f">{{ f }}</button>
+        @for (f of filters; track f.label) {
+          <button class="chip" [class.active]="activeFilter === f.label" (click)="setFilter(f)">{{ f.label }}</button>
         }
       </div>
 
@@ -41,11 +44,11 @@ import { RunEvent } from '../../core/models/run-event.model';
         <div class="loading-state">
           @for (i of [1,2,3]; track i) { <div class="skeleton"></div> }
         </div>
-      } @else if (filteredRuns.length === 0) {
+      } @else if (runsService.getRuns()().length === 0) {
         <div class="empty">No runs found. Check back soon!</div>
       } @else {
         <div class="feed">
-          @for (run of filteredRuns; track run.id) {
+          @for (run of runsService.getRuns()(); track run.id) {
             <app-run-card
               [run]="run"
               [isJoined]="runsService.getJoinedRunIds()().includes(run.id)"
@@ -72,7 +75,8 @@ import { RunEvent } from '../../core/models/run-event.model';
     .avatar { width: 36px; height: 36px; border-radius: 50%; background: #E1F5EE; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 500; color: #0F6E56; }
     .search-row { padding: 0 16px 14px; }
     .search-box { background: rgba(255,255,255,0.1); border-radius: 12px; padding: 12px 14px; display: flex; align-items: center; gap: 10px; }
-    .search-box span { color: rgba(255,255,255,0.35); font-size: 14px; }
+    .search-box input { border: none; outline: none; background: transparent; color: #fff; font-size: 14px; font-family: inherit; flex: 1; }
+    .search-box input::placeholder { color: rgba(255,255,255,0.35); }
     .filter-row { display: flex; gap: 8px; padding: 0 16px 16px; overflow-x: auto; }
     .filter-row::-webkit-scrollbar { display: none; }
     .chip { border-radius: 999px; padding: 7px 16px; font-size: 13px; font-weight: 500; white-space: nowrap; border: 1px solid rgba(255,255,255,0.15); background: transparent; color: rgba(255,255,255,0.6); font-family: inherit; cursor: pointer; }
@@ -87,31 +91,59 @@ import { RunEvent } from '../../core/models/run-event.model';
 export class HomeComponent implements OnInit {
   runsService = inject(RunsService);
   auth = inject(AuthService);
+  toast = inject(ToastService);
   cdr = inject(ChangeDetectorRef);
   selectedRun = signal<RunEvent | null>(null);
   loaded = false;
-  filters = ['All runs', 'Today', 'This week', '5k+', '10k+'];
+  searchQuery = '';
   activeFilter = 'All runs';
 
-  get initials() {
-    return (this.auth.getUser()()?.displayName ?? '').split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0,2);
-  }
+  private searchSubject = new Subject<string>();
 
-  get filteredRuns(): RunEvent[] {
-    const runs = this.runsService.getRuns()();
-    const now = Date.now();
-    if (this.activeFilter === 'Today') return runs.filter(r => new Date(r.date).toDateString() === new Date().toDateString());
-    if (this.activeFilter === 'This week') return runs.filter(r => new Date(r.date).getTime() - now < 7 * 86400000);
-    if (this.activeFilter === '5k+') return runs.filter(r => r.distanceKm >= 5);
-    if (this.activeFilter === '10k+') return runs.filter(r => r.distanceKm >= 10);
-    return runs;
+  filters = [
+    { label: 'All runs', params: {} },
+    { label: 'Today', params: { date: 'today' } },
+    { label: 'This week', params: { date: 'week' } },
+    { label: '5k+', params: { distance_min: 5 } },
+    { label: '10k+', params: { distance_min: 10 } },
+  ];
+
+  private currentParams: any = {};
+
+  get initials() {
+    return (this.auth.getUser()()?.displayName ?? '').split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
   }
 
   ngOnInit() {
-    this.runsService.loadRuns();
-    setTimeout(() => { this.loaded = true; this.cdr.markForCheck(); }, 800);
+    this.loadWithParams();
+    this.searchSubject.pipe(debounceTime(300), distinctUntilChanged()).subscribe(q => {
+      this.currentParams = { ...this.currentParams, search: q || undefined };
+      this.loadWithParams();
+    });
+  }
+
+  onSearchChange(q: string) {
+    this.searchSubject.next(q);
+  }
+
+  setFilter(f: { label: string; params: any }) {
+    this.activeFilter = f.label;
+    this.currentParams = { ...f.params };
+    if (this.searchQuery) this.currentParams.search = this.searchQuery;
+    this.loadWithParams();
+  }
+
+  private loadWithParams() {
+    this.loaded = false;
+    this.runsService.loadRuns(this.currentParams);
+    setTimeout(() => { this.loaded = true; this.cdr.markForCheck(); }, 600);
   }
 
   openDialog(run: RunEvent) { this.selectedRun.set(run); }
-  onJoin(runId: string) { this.runsService.toggleJoin(runId, this.auth.getUser()()?.id ?? 'guest'); }
+
+  onJoin(runId: string) {
+    this.runsService.toggleJoin(runId, this.auth.getUser()()?.id ?? 'guest');
+    const isJoined = this.runsService.getJoinedRunIds()().includes(runId);
+    this.toast.show(isJoined ? 'Left the run' : "You're in!");
+  }
 }

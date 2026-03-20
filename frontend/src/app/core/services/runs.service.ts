@@ -24,12 +24,19 @@ export class RunsService {
       date: new Date(r.event_date), distanceKm: parseFloat(r.distance_km),
       estimatedMinutes: r.estimated_minutes, attendees: r.attendees ?? [],
       maxAttendees: r.max_attendees, notes: r.notes,
-      status: r.status, createdBy: r.created_by
+      status: r.status, createdBy: r.created_by,
+      pace: r.pace, tags: r.tags
     };
   }
 
-  loadRuns() {
-    return this.http.get<any[]>(`${environment.apiUrl}/runs`).subscribe(data => {
+  loadRuns(params?: { search?: string; distance_min?: number; date?: string; city?: string; pace?: string }) {
+    const queryParams: any = {};
+    if (params?.search) queryParams.search = params.search;
+    if (params?.distance_min) queryParams.distance_min = params.distance_min;
+    if (params?.date) queryParams.date = params.date;
+    if (params?.city) queryParams.city = params.city;
+    if (params?.pace) queryParams.pace = params.pace;
+    return this.http.get<any[]>(`${environment.apiUrl}/runs`, { params: queryParams }).subscribe(data => {
       this.runs.set(data.map(r => this.mapRun(r)));
     });
   }

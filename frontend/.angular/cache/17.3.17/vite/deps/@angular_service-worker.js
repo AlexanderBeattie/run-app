@@ -1,26 +1,29 @@
 import {
   isPlatformBrowser
-} from "./chunk-YKEOTZ6E.js";
+} from "./chunk-G2AVQ6IK.js";
 import {
   APP_INITIALIZER,
   ApplicationRef,
   Injectable,
   InjectionToken,
   Injector,
-  NEVER,
   NgModule,
   NgZone,
   PLATFORM_ID,
-  defer,
-  fromEvent,
   makeEnvironmentProviders,
-  merge,
   setClassMetadata,
   ɵɵdefineInjectable,
   ɵɵdefineInjector,
   ɵɵdefineNgModule,
   ɵɵinject
-} from "./chunk-I7SYWQPK.js";
+} from "./chunk-E3DUWY7V.js";
+import "./chunk-IH7WIZXF.js";
+import {
+  NEVER,
+  defer,
+  fromEvent,
+  merge
+} from "./chunk-P5FFYDKM.js";
 import {
   Subject,
   __spreadValues,
@@ -34,7 +37,7 @@ import {
   take,
   tap,
   throwError
-} from "./chunk-VKWKDNDB.js";
+} from "./chunk-TZ3IMUY4.js";
 
 // ../node_modules/@angular/service-worker/fesm2022/service-worker.mjs
 var ERR_SW_NOT_SUPPORTED = "Service workers are disabled or not supported by this browser";

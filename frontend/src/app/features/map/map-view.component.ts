@@ -8,6 +8,9 @@ import { environment } from '../../../environments/environment';
 
 declare const google: any;
 
+const GLASGOW_DEFAULT = { lat: 55.8642, lng: -4.2518 };
+const LOCATION_KEY = 'klub_last_location';
+
 @Component({
   selector: 'app-map-view',
   standalone: true,
@@ -28,6 +31,12 @@ declare const google: any;
           </svg>
         </a>
       }
+
+      <button class="locate-btn" (click)="locateUser()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"/><path d="M12 2v4m0 12v4m10-10h-4M6 12H2"/>
+        </svg>
+      </button>
 
       <div class="sheet" [class.expanded]="sheetOpen()">
         <div class="sheet-handle" (click)="sheetOpen.set(!sheetOpen())">
@@ -67,6 +76,7 @@ declare const google: any;
     .map-title { font-size: 18px; font-weight: 700; letter-spacing: 0.18em; color: #1D9E75; }
     .runs-count { font-size: 12px; color: rgba(255,255,255,0.6); margin-top: 2px; }
     .fab { position: absolute; bottom: 220px; right: 16px; width: 52px; height: 52px; border-radius: 50%; background: #1D9E75; display: flex; align-items: center; justify-content: center; text-decoration: none; z-index: 10; }
+    .locate-btn { position: absolute; bottom: 220px; left: 16px; width: 44px; height: 44px; border-radius: 50%; background: #fff; border: none; box-shadow: 0 2px 8px rgba(0,0,0,0.15); display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 10; color: #0D0D0D; }
     .sheet { position: absolute; bottom: 0; left: 0; right: 0; background: #fff; border-radius: 20px 20px 0 0; max-height: 70%; transition: transform 0.3s ease; transform: translateY(calc(100% - 72px)); z-index: 10; display: flex; flex-direction: column; }
     .sheet.expanded { transform: translateY(0); }
     .sheet-handle { padding: 10px 16px 8px; display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: pointer; flex-shrink: 0; }
@@ -88,8 +98,21 @@ export class MapViewComponent implements OnInit, AfterViewInit {
   runsService = inject(RunsService);
   auth = inject(AuthService);
   map: any;
+  userMarker: any;
   sheetOpen = signal(false);
   dialogRun = signal<RunEvent | null>(null);
+
+  private getStoredLocation(): { lat: number; lng: number } {
+    try {
+      const stored = localStorage.getItem(LOCATION_KEY);
+      if (stored) return JSON.parse(stored);
+    } catch { }
+    return GLASGOW_DEFAULT;
+  }
+
+  private storeLocation(coords: { lat: number; lng: number }) {
+    localStorage.setItem(LOCATION_KEY, JSON.stringify(coords));
+  }
 
   ngOnInit() { this.runsService.loadRuns(); }
 
@@ -102,11 +125,18 @@ export class MapViewComponent implements OnInit, AfterViewInit {
   }
 
   initMap() {
+    const startLocation = this.getStoredLocation();
     this.map = new google.maps.Map(this.mapEl.nativeElement, {
-      center: { lat: 51.515, lng: -0.08 }, zoom: 12,
+      center: startLocation, zoom: 13,
       disableDefaultUI: true, zoomControl: true,
       styles: [{ featureType: 'poi', stylers: [{ visibility: 'off' }] }]
     });
+
+    this.addRunMarkers();
+    this.locateUser();
+  }
+
+  addRunMarkers() {
     this.runsService.getRuns()().forEach(run => {
       const m = new google.maps.Marker({
         position: run.startLocation, map: this.map, title: run.clubName,
@@ -114,6 +144,34 @@ export class MapViewComponent implements OnInit, AfterViewInit {
       });
       m.addListener('click', () => this.dialogRun.set(run));
     });
+  }
+
+  locateUser() {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        this.storeLocation(coords);
+        this.map.panTo(coords);
+        this.map.setZoom(13);
+        this.setUserMarker(coords);
+      },
+      () => {
+        // Denied or error — stay on stored/default location
+      },
+      { enableHighAccuracy: true, timeout: 8000 }
+    );
+  }
+
+  private setUserMarker(coords: { lat: number; lng: number }) {
+    if (this.userMarker) this.userMarker.setPosition(coords);
+    else {
+      this.userMarker = new google.maps.Marker({
+        position: coords, map: this.map, title: 'You',
+        icon: { path: google.maps.SymbolPath.CIRCLE, scale: 7, fillColor: '#4285F4', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2.5 },
+        zIndex: 999
+      });
+    }
   }
 
   openDialog(run: RunEvent) { this.dialogRun.set(run); this.sheetOpen.set(false); }

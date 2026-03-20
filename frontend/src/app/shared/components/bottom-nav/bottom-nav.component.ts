@@ -28,6 +28,17 @@ import { AuthService } from '../../../core/services/auth.service';
         <span>Map</span>
       </a>
 
+      <a class="nav-item" routerLink="/clubs" [class.active]="isActive('/clubs')">
+        <div class="icon-wrap" [class.active]="isActive('/clubs')">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" [attr.stroke]="isActive('/clubs') ? '#fff' : '#9B9B98'" stroke-width="2">
+            <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+            <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>
+          </svg>
+        </div>
+        <span>Clubs</span>
+      </a>
+
       @if (auth.isOrganizer()) {
         <a class="nav-item" routerLink="/organiser" [class.active]="isActive('/organiser')">
           <div class="icon-wrap" [class.active]="isActive('/organiser')">
@@ -58,8 +69,8 @@ import { AuthService } from '../../../core/services/auth.service';
       padding: 8px 0 max(12px, env(safe-area-inset-bottom));
       position: sticky; bottom: 0; z-index: 100;
     }
-    .nav-item { display: flex; flex-direction: column; align-items: center; gap: 4px; text-decoration: none; min-width: 64px; }
-    .icon-wrap { width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: background 0.15s; }
+    .nav-item { display: flex; flex-direction: column; align-items: center; gap: 4px; text-decoration: none; min-width: 56px; }
+    .icon-wrap { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: background 0.15s; }
     .icon-wrap.active { background: #0D0D0D; }
     .nav-item span { font-size: 10px; color: #9B9B98; font-weight: 500; }
     .nav-item.active span { color: #0D0D0D; }

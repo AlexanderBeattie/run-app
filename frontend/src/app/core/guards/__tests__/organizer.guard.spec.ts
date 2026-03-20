@@ -13,6 +13,7 @@ describe('organizerGuard', () => {
     authService = { isLoggedIn: jest.fn(), getUser: jest.fn() };
     router = { navigate: jest.fn() };
 
+    TestBed.resetTestingModule();
     TestBed.configureTestingModule({
       providers: [
         { provide: AuthService, useValue: authService },

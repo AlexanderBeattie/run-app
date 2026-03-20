@@ -10,6 +10,7 @@ describe('AuthService', () => {
 
   beforeEach(() => {
     localStorage.clear();
+    TestBed.resetTestingModule();
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(),

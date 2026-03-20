@@ -6,6 +6,7 @@ import { pool } from './db';
 import authRoutes from './routes/auth.routes';
 import runsRoutes from './routes/runs.routes';
 import clubsRoutes from './routes/clubs.routes';
+import geocodeRoutes from './routes/geocode.routes';
 
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
@@ -29,6 +30,7 @@ app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/runs', runsRoutes);
 app.use('/api/clubs', clubsRoutes);
+app.use('/api/geocode', geocodeRoutes);
 
 app.get('/api/health', (_req, res) => {
   res.json({

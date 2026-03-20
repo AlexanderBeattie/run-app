@@ -1,7 +1,37 @@
-node_modules
+# Dependencies
+node_modules/
+
+# Environment
 .env
-dist
-frontend/dist
-backend/dist
-coverage
-EOF
+.env.local
+.env.production
+
+# Generated
+frontend/src/environments/environment.ts
+
+# Build output
+dist/
+frontend/dist/
+backend/dist/
+
+# Coverage
+coverage/
+frontend/coverage/
+backend/coverage/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Angular cache
+frontend/.angular/
+
+# Logs
+*.log
+npm-debug.log*

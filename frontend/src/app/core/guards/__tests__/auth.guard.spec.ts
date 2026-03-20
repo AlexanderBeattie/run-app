@@ -12,6 +12,7 @@ describe('authGuard', () => {
     authService = { isLoggedIn: jest.fn() };
     router = { navigate: jest.fn() };
 
+    TestBed.resetTestingModule();
     TestBed.configureTestingModule({
       providers: [
         { provide: AuthService, useValue: authService },
