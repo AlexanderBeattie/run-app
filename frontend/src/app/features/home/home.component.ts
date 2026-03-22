@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, ChangeDetectorRef, signal } from '@angular/core';
+import { Component, inject, OnInit, ChangeDetectorRef, signal, DestroyRef } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { RunsService } from '../../core/services/runs.service';
@@ -8,6 +8,7 @@ import { RunCardComponent } from '../../shared/components/run-card/run-card.comp
 import { RunDetailDialogComponent } from '../../shared/components/run-detail-dialog/run-detail-dialog.component';
 import { RunEvent } from '../../core/models/run-event.model';
 import { Subject, debounceTime, distinctUntilChanged } from 'rxjs';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 @Component({
   selector: 'app-home',
@@ -70,6 +71,18 @@ import { Subject, debounceTime, distinctUntilChanged } from 'rxjs';
           </div>
         }
       </div>
+
+      <!-- Error message -->
+      @if (errorMessage()) {
+        <div class="error-banner">
+          <div class="error-icon">⚠</div>
+          <div>
+            <div class="error-title">Unable to load runs</div>
+            <div class="error-text">{{ errorMessage() }}</div>
+          </div>
+          <button class="error-close" (click)="errorMessage.set(null)">×</button>
+        </div>
+      }
 
       <!-- Feed section -->
       <div class="feed-header">
@@ -270,6 +283,31 @@ import { Subject, debounceTime, distinctUntilChanged } from 'rxjs';
     .empty-icon { font-size: 40px; margin-bottom: 12px; }
     .empty-title { font-size: 16px; font-weight: 600; color: #0D0D0D; margin-bottom: 6px; }
     .empty-sub { font-size: 14px; color: #9B9B98; }
+
+    /* ── Error banner ─────────────────────────────────────────── */
+    .error-banner {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      margin: 14px 16px;
+      background: #FCEBEB;
+      border: 1px solid #E89999;
+      border-radius: 12px;
+      padding: 12px 14px;
+    }
+    .error-icon { font-size: 18px; flex-shrink: 0; }
+    .error-title { font-size: 14px; font-weight: 600; color: #A32D2D; margin-bottom: 2px; }
+    .error-text { font-size: 13px; color: #8B2828; }
+    .error-close {
+      background: none;
+      border: none;
+      color: #A32D2D;
+      cursor: pointer;
+      font-size: 20px;
+      padding: 0;
+      margin-left: auto;
+      flex-shrink: 0;
+    }
   `]
 })
 export class HomeComponent implements OnInit {
@@ -277,8 +315,10 @@ export class HomeComponent implements OnInit {
   auth = inject(AuthService);
   toast = inject(ToastService);
   cdr = inject(ChangeDetectorRef);
+  destroyRef = inject(DestroyRef);
 
   selectedRun = signal<RunEvent | null>(null);
+  errorMessage = signal<string | null>(null);
   loaded = false;
   searchQuery = '';
   activeCategory = 'All';
@@ -314,7 +354,7 @@ export class HomeComponent implements OnInit {
 
   ngOnInit() {
     this.loadWithParams();
-    this.searchSubject.pipe(debounceTime(300), distinctUntilChanged()).subscribe(q => {
+    this.searchSubject.pipe(debounceTime(300), distinctUntilChanged(), takeUntilDestroyed(this.destroyRef)).subscribe(q => {
       this.currentParams = { ...this.currentParams, search: q || undefined };
       this.loadWithParams();
     });

@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, ChangeDetectorRef } from '@angular/core';
+import { Component, inject, OnInit, ChangeDetectorRef, signal } from '@angular/core';
 import { RunsService } from '../../core/services/runs.service';
 import { AuthService } from '../../core/services/auth.service';
 import { Router } from '@angular/router';
@@ -21,6 +21,17 @@ import { Router } from '@angular/router';
         <div class="stat"><div class="sv">{{ runs.length }}</div><div class="sl">runs joined</div></div>
         <div class="stat"><div class="sv">{{ totalKm }}k</div><div class="sl">total distance</div></div>
       </div>
+
+      @if (errorMessage()) {
+        <div class="error-banner">
+          <div class="error-icon">⚠</div>
+          <div>
+            <div class="error-title">Unable to load runs</div>
+            <div class="error-text">{{ errorMessage() }}</div>
+          </div>
+          <button class="error-close" (click)="errorMessage.set(null)">×</button>
+        </div>
+      }
 
       <div class="section-title">Your upcoming runs</div>
 
@@ -56,6 +67,32 @@ import { Router } from '@angular/router';
     .stat { flex: 1; background: #fff; border: 0.5px solid rgba(0,0,0,0.08); border-radius: 12px; padding: 14px; text-align: center; }
     .sv { font-size: 22px; font-weight: 500; color: #0D0D0D; }
     .sl { font-size: 11px; color: #9B9B98; margin-top: 2px; }
+
+    /* ── Error banner ─────────────────────────────────────────── */
+    .error-banner {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      margin: 14px 16px 12px 16px;
+      background: #FCEBEB;
+      border: 1px solid #E89999;
+      border-radius: 12px;
+      padding: 12px 14px;
+    }
+    .error-icon { font-size: 18px; flex-shrink: 0; }
+    .error-title { font-size: 14px; font-weight: 600; color: #A32D2D; margin-bottom: 2px; }
+    .error-text { font-size: 13px; color: #8B2828; }
+    .error-close {
+      background: none;
+      border: none;
+      color: #A32D2D;
+      cursor: pointer;
+      font-size: 20px;
+      padding: 0;
+      margin-left: auto;
+      flex-shrink: 0;
+    }
+
     .section-title { font-size: 11px; font-weight: 500; color: #9B9B98; text-transform: uppercase; letter-spacing: 0.06em; padding: 16px 20px 10px; }
     .empty { text-align: center; padding: 40px 20px; font-size: 14px; color: #9B9B98; }
     .list { display: flex; flex-direction: column; gap: 2px; padding: 0 12px; }
@@ -73,13 +110,24 @@ export class RunnerProfileComponent implements OnInit {
   cdr = inject(ChangeDetectorRef);
   runs: any[] = [];
   loaded = false;
+  errorMessage = signal<string | null>(null);
 
   get initials() { return (this.auth.getUser()()?.displayName ?? '').split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0,2); }
   get totalKm() { return Math.round(this.runs.reduce((acc, r) => acc + parseFloat(r.distance_km), 0)); }
 
   ngOnInit() {
-    this.svc.getJoinedRuns().subscribe(data => {
-      this.runs = data; this.loaded = true; this.cdr.markForCheck();
+    this.svc.getJoinedRuns().subscribe({
+      next: (data) => {
+        this.runs = data;
+        this.loaded = true;
+        this.errorMessage.set(null);
+        this.cdr.markForCheck();
+      },
+      error: (err) => {
+        this.loaded = true;
+        this.errorMessage.set('Failed to load your runs. Please try again.');
+        this.cdr.markForCheck();
+      }
     });
   }
 

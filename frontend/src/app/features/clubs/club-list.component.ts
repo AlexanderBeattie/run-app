@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, ChangeDetectorRef } from '@angular/core';
+import { Component, inject, OnInit, ChangeDetectorRef, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { ClubService } from '../../core/services/club.service';
@@ -31,9 +31,29 @@ import { Club } from '../../core/models/run-event.model';
       </div>
 
       <div class="content">
-        @if (!loaded) {
+        @if (errorMessage()) {
+          <div class="error-banner">
+            <div class="error-icon">⚠</div>
+            <div>
+              <div class="error-title">Unable to load clubs</div>
+              <div class="error-text">{{ errorMessage() }}</div>
+            </div>
+            <button class="error-close" (click)="errorMessage.set(null)">×</button>
+          </div>
+        }
+
+        @if (loading()) {
           <div class="loading">
-            @for (i of [1,2,3]; track i) { <div class="skeleton"></div> }
+            @for (i of [1,2,3]; track i) {
+              <div class="skeleton-card">
+                <div class="skeleton-avatar"></div>
+                <div class="skeleton-content">
+                  <div class="skeleton-title"></div>
+                  <div class="skeleton-text"></div>
+                  <div class="skeleton-meta"></div>
+                </div>
+              </div>
+            }
           </div>
         } @else if (filteredClubs.length === 0) {
           <div class="empty">No clubs found. Check back soon!</div>
@@ -73,8 +93,83 @@ import { Club } from '../../core/models/run-event.model';
     .search-box { background: #fff; border: 0.5px solid rgba(0,0,0,0.1); border-radius: 12px; padding: 10px 14px; display: flex; align-items: center; gap: 10px; }
     .search-box input { border: none; outline: none; font-size: 14px; font-family: inherit; flex: 1; background: transparent; color: #0D0D0D; }
     .content { padding: 14px 12px 24px; }
-    .loading { display: flex; flex-direction: column; gap: 10px; }
-    .skeleton { height: 80px; background: rgba(0,0,0,0.06); border-radius: 14px; }
+
+    /* ── Error banner ─────────────────────────────────────────── */
+    .error-banner {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      margin: 0 0 14px 0;
+      background: #FCEBEB;
+      border: 1px solid #E89999;
+      border-radius: 12px;
+      padding: 12px 14px;
+    }
+    .error-icon { font-size: 18px; flex-shrink: 0; }
+    .error-title { font-size: 14px; font-weight: 600; color: #A32D2D; margin-bottom: 2px; }
+    .error-text { font-size: 13px; color: #8B2828; }
+    .error-close {
+      background: none;
+      border: none;
+      color: #A32D2D;
+      cursor: pointer;
+      font-size: 20px;
+      padding: 0;
+      margin-left: auto;
+      flex-shrink: 0;
+    }
+
+    /* ── Loading skeletons ──────────────────────────────────────── */
+    .loading { display: flex; flex-direction: column; gap: 8px; }
+    .skeleton-card {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: #fff;
+      border: 0.5px solid rgba(0,0,0,0.08);
+      border-radius: 14px;
+      padding: 14px;
+    }
+    .skeleton-avatar {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      background: rgba(0,0,0,0.06);
+      flex-shrink: 0;
+      animation: shimmer 1.6s ease-in-out infinite;
+    }
+    .skeleton-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .skeleton-title {
+      height: 15px;
+      background: rgba(0,0,0,0.06);
+      border-radius: 4px;
+      width: 60%;
+      animation: shimmer 1.6s ease-in-out infinite;
+    }
+    .skeleton-text {
+      height: 12px;
+      background: rgba(0,0,0,0.04);
+      border-radius: 3px;
+      width: 40%;
+      animation: shimmer 1.6s ease-in-out infinite;
+    }
+    .skeleton-meta {
+      height: 11px;
+      background: rgba(0,0,0,0.04);
+      border-radius: 3px;
+      width: 50%;
+      animation: shimmer 1.6s ease-in-out infinite;
+    }
+    @keyframes shimmer {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.45; }
+    }
+
     .empty { text-align: center; padding: 60px 20px; font-size: 14px; color: #9B9B98; }
     .list { display: flex; flex-direction: column; gap: 8px; }
     .club-card { display: flex; align-items: center; gap: 14px; background: #fff; border: 0.5px solid rgba(0,0,0,0.08); border-radius: 14px; padding: 14px; text-decoration: none; color: inherit; }
@@ -97,13 +192,26 @@ export class ClubListComponent implements OnInit {
     filteredClubs: Club[] = [];
     searchQuery = '';
     loaded = false;
+    loading = signal(false);
+    errorMessage = signal<string | null>(null);
 
     ngOnInit() {
-        this.clubService.listClubs().subscribe(data => {
-            this.clubs = data;
-            this.filteredClubs = data;
-            this.loaded = true;
-            this.cdr.markForCheck();
+        this.loading.set(true);
+        this.clubService.listClubs().subscribe({
+            next: (data) => {
+                this.clubs = data;
+                this.filteredClubs = data;
+                this.loaded = true;
+                this.loading.set(false);
+                this.errorMessage.set(null);
+                this.cdr.markForCheck();
+            },
+            error: (err) => {
+                this.loaded = true;
+                this.loading.set(false);
+                this.errorMessage.set('Failed to load clubs. Please try again.');
+                this.cdr.markForCheck();
+            }
         });
     }
 

@@ -15,7 +15,14 @@ import { signal } from '@angular/core';
     imports: [RouterLink, RunCardComponent, RunDetailDialogComponent],
     template: `
     <div class="page">
-      @if (!club) {
+      @if (errorMessage()) {
+        <div class="error-page">
+          <div class="error-icon">⚠</div>
+          <div class="error-title">Unable to load club</div>
+          <div class="error-text">{{ errorMessage() }}</div>
+          <button class="error-retry" (click)="retry()">Try again</button>
+        </div>
+      } @else if (!club) {
         <div class="loading-page"><div class="spinner"></div></div>
       } @else {
         <div class="header">
@@ -89,6 +96,33 @@ import { signal } from '@angular/core';
   `,
     styles: [`
     .page { background: #F7F7F5; min-height: 100%; }
+
+    /* ── Error page ─────────────────────────────────────────────── */
+    .error-page {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 60vh;
+      padding: 20px;
+      text-align: center;
+    }
+    .error-icon { font-size: 48px; margin-bottom: 16px; }
+    .error-title { font-size: 18px; font-weight: 600; color: #0D0D0D; margin-bottom: 8px; }
+    .error-text { font-size: 14px; color: #9B9B98; margin-bottom: 20px; }
+    .error-retry {
+      background: #1D9E75;
+      color: #E1F5EE;
+      border: none;
+      border-radius: 10px;
+      padding: 12px 24px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .error-retry:hover { opacity: 0.9; }
+
     .loading-page { display: flex; align-items: center; justify-content: center; min-height: 60vh; }
     .spinner { width: 32px; height: 32px; border: 3px solid rgba(0,0,0,0.1); border-top-color: #1D9E75; border-radius: 50%; animation: spin 0.8s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
@@ -135,24 +169,58 @@ export class ClubProfileComponent implements OnInit {
     runs: any[] = [];
     isMember = false;
     selectedRun = signal<RunEvent | null>(null);
+    errorMessage = signal<string | null>(null);
+    clubId = '';
 
     get isOwner() { return this.club?.owner_id === this.auth.getUser()()?.id; }
 
     ngOnInit() {
-        const id = this.route.snapshot.paramMap.get('id') ?? '';
-        this.clubService.getClub(id).subscribe(c => {
-            this.club = c;
-            this.cdr.markForCheck();
+        this.clubId = this.route.snapshot.paramMap.get('id') ?? '';
+        this.loadClubData();
+    }
+
+    private loadClubData() {
+        this.clubService.getClub(this.clubId).subscribe({
+            next: (c) => {
+                this.club = c;
+                this.errorMessage.set(null);
+                this.cdr.markForCheck();
+            },
+            error: () => {
+                this.errorMessage.set('Failed to load club profile. Please try again.');
+                this.cdr.markForCheck();
+            }
         });
-        this.clubService.getClubMembers(id).subscribe(m => {
-            this.members = m;
-            this.isMember = m.some(member => member.id === this.auth.getUser()()?.id);
-            this.cdr.markForCheck();
+        this.clubService.getClubMembers(this.clubId).subscribe({
+            next: (m) => {
+                this.members = m;
+                this.isMember = m.some(member => member.id === this.auth.getUser()()?.id);
+                this.cdr.markForCheck();
+            },
+            error: () => {
+                this.errorMessage.set('Failed to load members. Please try again.');
+                this.cdr.markForCheck();
+            }
         });
-        this.clubService.getClubRuns(id).subscribe(r => {
-            this.runs = r;
-            this.cdr.markForCheck();
+        this.clubService.getClubRuns(this.clubId).subscribe({
+            next: (r) => {
+                this.runs = r;
+                this.errorMessage.set(null);
+                this.cdr.markForCheck();
+            },
+            error: () => {
+                this.errorMessage.set('Failed to load runs. Please try again.');
+                this.cdr.markForCheck();
+            }
         });
+    }
+
+    retry() {
+        this.errorMessage.set(null);
+        this.club = null;
+        this.members = [];
+        this.runs = [];
+        this.loadClubData();
     }
 
     toggleJoin() {

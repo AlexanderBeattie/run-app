@@ -5,6 +5,7 @@ import { RunsService } from '../../core/services/runs.service';
 import { AuthService } from '../../core/services/auth.service';
 import { GeocodingService } from '../../core/services/geocoding.service';
 import { ClubService } from '../../core/services/club.service';
+import { ToastService } from '../../shared/services/toast.service';
 import { Club } from '../../core/models/run-event.model';
 
 @Component({
@@ -26,9 +27,10 @@ import { Club } from '../../core/models/run-event.model';
       <div class="form">
         @if (auth.isOrganizer() && myClubs.length > 0) {
           <div class="field">
-            <label>Post under club</label>
+            <label>Post as club</label>
+            <p class="field-hint">The run will appear under the selected club's name</p>
             <select [(ngModel)]="selectedClubId">
-              <option [ngValue]="null">Independent run</option>
+              <option [ngValue]="null">Independent run (no club)</option>
               @for (club of myClubs; track club.id) {
                 <option [ngValue]="club.id">{{ club.name }}</option>
               }
@@ -38,27 +40,32 @@ import { Club } from '../../core/models/run-event.model';
 
         <div class="field">
           <label>Run title</label>
-          <input [(ngModel)]="title" placeholder="e.g. Sunday morning 10k" />
+          <input [(ngModel)]="title" (blur)="touched.title = true" [class.invalid]="touched.title && !title" placeholder="e.g. Sunday morning 10k" />
+          @if (touched.title && !title) { <span class="field-error">Required</span> }
         </div>
 
         <div class="field">
           <label>Start address</label>
-          <input [(ngModel)]="startAddress" placeholder="e.g. Victoria Park, London" />
+          <input [(ngModel)]="startAddress" (blur)="touched.startAddress = true" [class.invalid]="touched.startAddress && !startAddress" placeholder="e.g. Victoria Park, London" />
+          @if (touched.startAddress && !startAddress) { <span class="field-error">Required</span> }
         </div>
 
         <div class="field">
           <label>End address</label>
-          <input [(ngModel)]="endAddress" placeholder="e.g. Canary Wharf, London" />
+          <input [(ngModel)]="endAddress" (blur)="touched.endAddress = true" [class.invalid]="touched.endAddress && !endAddress" placeholder="e.g. Canary Wharf, London" />
+          @if (touched.endAddress && !endAddress) { <span class="field-error">Required</span> }
         </div>
 
         <div class="field-row">
           <div class="field">
             <label>Date</label>
-            <input type="date" [(ngModel)]="date" />
+            <input type="date" [(ngModel)]="date" (blur)="touched.date = true" [class.invalid]="touched.date && !date" />
+            @if (touched.date && !date) { <span class="field-error">Required</span> }
           </div>
           <div class="field">
             <label>Time</label>
-            <input type="time" [(ngModel)]="time" />
+            <input type="time" [(ngModel)]="time" (blur)="touched.time = true" [class.invalid]="touched.time && !time" />
+            @if (touched.time && !time) { <span class="field-error">Required</span> }
           </div>
         </div>
 
@@ -106,6 +113,7 @@ import { Club } from '../../core/models/run-event.model';
     .field { display: flex; flex-direction: column; gap: 6px; }
     .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     label { font-size: 13px; font-weight: 500; color: #3D3D3B; }
+    .field-hint { font-size: 12px; color: #9B9B98; margin: -2px 0 4px 0; font-style: italic; }
     input, textarea, select {
       border: 1px solid rgba(0,0,0,0.12);
       border-radius: 10px;
@@ -117,7 +125,9 @@ import { Club } from '../../core/models/run-event.model';
       background: #fff;
     }
     input:focus, textarea:focus, select:focus { border-color: #1D9E75; }
+    input.invalid, textarea.invalid { border-color: #A32D2D; }
     textarea { resize: vertical; }
+    .field-error { font-size: 12px; color: #A32D2D; margin-top: -2px; }
     .error { background: #FCEBEB; color: #A32D2D; border-radius: 10px; padding: 12px; font-size: 14px; }
     .info { background: #E1F5EE; color: #0F6E56; border-radius: 10px; padding: 12px; font-size: 14px; }
     .submit { background: #1D9E75; color: #E1F5EE; border: none; border-radius: 12px; padding: 16px; font-size: 16px; font-weight: 500; cursor: pointer; font-family: inherit; }
@@ -130,6 +140,7 @@ export class CreateRunComponent implements OnInit {
   router = inject(Router);
   geo = inject(GeocodingService);
   clubService = inject(ClubService);
+  toast = inject(ToastService);
 
   title = '';
   startAddress = '';
@@ -142,6 +153,8 @@ export class CreateRunComponent implements OnInit {
   notes = '';
   error = '';
   loading = false;
+
+  touched = { title: false, startAddress: false, endAddress: false, date: false, time: false };
 
   myClubs: Club[] = [];
   selectedClubId: string | null = null;
@@ -161,6 +174,7 @@ export class CreateRunComponent implements OnInit {
 
   async submit() {
     if (!this.title || !this.startAddress || !this.endAddress || !this.date || !this.time) {
+      this.touched = { title: true, startAddress: true, endAddress: true, date: true, time: true };
       this.error = 'Please fill in all required fields.';
       return;
     }
@@ -199,7 +213,7 @@ export class CreateRunComponent implements OnInit {
       maxAttendees: this.maxAttendees,
       notes: this.notes
     }).subscribe({
-      next: () => this.router.navigate(['/organiser']),
+      next: () => { this.toast.show('Run posted!'); this.router.navigate(['/organiser']); },
       error: () => {
         this.error = 'Failed to post run.';
         this.loading = false;
