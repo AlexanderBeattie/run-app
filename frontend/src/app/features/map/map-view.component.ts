@@ -119,7 +119,7 @@ export class MapViewComponent implements OnInit, AfterViewInit {
   ngAfterViewInit() {
     if (typeof google !== 'undefined') { this.initMap(); return; }
     const s = document.createElement('script');
-    s.src = `https://maps.googleapis.com/maps/api/js?key=${environment.googleMapsApiKey}`;
+    s.src = `https://maps.googleapis.com/maps/api/js?key=${environment.googleMapsApiKey}&libraries=marker`;
     s.onload = () => this.initMap();
     document.head.appendChild(s);
   }
@@ -129,7 +129,7 @@ export class MapViewComponent implements OnInit, AfterViewInit {
     this.map = new google.maps.Map(this.mapEl.nativeElement, {
       center: startLocation, zoom: 13,
       disableDefaultUI: true, zoomControl: true,
-      styles: [{ featureType: 'poi', stylers: [{ visibility: 'off' }] }]
+      mapId: 'KLUB_MAP'
     });
 
     this.addRunMarkers();
@@ -138,9 +138,11 @@ export class MapViewComponent implements OnInit, AfterViewInit {
 
   addRunMarkers() {
     this.runsService.getRuns()().forEach(run => {
-      const m = new google.maps.Marker({
-        position: run.startLocation, map: this.map, title: run.clubName,
-        icon: { path: google.maps.SymbolPath.CIRCLE, scale: 10, fillColor: '#1D9E75', fillOpacity: 1, strokeColor: '#0F6E56', strokeWeight: 2 }
+      const pin = new google.maps.marker.PinElement({
+        background: '#1D9E75', borderColor: '#0F6E56', glyphColor: '#fff', scale: 0.9
+      });
+      const m = new google.maps.marker.AdvancedMarkerElement({
+        position: run.startLocation, map: this.map, title: run.clubName, content: pin
       });
       m.addListener('click', () => this.dialogRun.set(run));
     });
@@ -164,11 +166,14 @@ export class MapViewComponent implements OnInit, AfterViewInit {
   }
 
   private setUserMarker(coords: { lat: number; lng: number }) {
-    if (this.userMarker) this.userMarker.setPosition(coords);
-    else {
-      this.userMarker = new google.maps.Marker({
-        position: coords, map: this.map, title: 'You',
-        icon: { path: google.maps.SymbolPath.CIRCLE, scale: 7, fillColor: '#4285F4', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2.5 },
+    if (this.userMarker) {
+      this.userMarker.position = coords;
+    } else {
+      const pin = new google.maps.marker.PinElement({
+        background: '#4285F4', borderColor: '#fff', glyphColor: '#fff', scale: 0.75
+      });
+      this.userMarker = new google.maps.marker.AdvancedMarkerElement({
+        position: coords, map: this.map, title: 'You', content: pin,
         zIndex: 999
       });
     }

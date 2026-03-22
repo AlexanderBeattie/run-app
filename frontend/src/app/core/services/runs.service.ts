@@ -7,13 +7,10 @@ import { environment } from '../../../environments/environment';
 export class RunsService {
   private http = inject(HttpClient);
   private runs = signal<RunEvent[]>([]);
-  private selectedRunId = signal<string | null>(null);
   private joinedRunIds = signal<string[]>([]);
 
   getRuns() { return this.runs; }
-  getSelectedRunId() { return this.selectedRunId; }
   getJoinedRunIds() { return this.joinedRunIds; }
-  selectRun(id: string | null) { this.selectedRunId.set(id); }
 
   private mapRun(r: any): RunEvent {
     return {
@@ -67,12 +64,10 @@ export class RunsService {
   deleteRun(id: string) { return this.http.delete<any>(`${environment.apiUrl}/runs/${id}`); }
   cancelRun(id: string) { return this.http.patch<any>(`${environment.apiUrl}/runs/${id}`, { status: 'cancelled' }); }
 
-  getStats() { return this.http.get<any>(`${environment.apiUrl}/runs/stats`); }
-
   formatDate(date: Date): string {
     const diff = new Date(date).getTime() - Date.now();
     const days = Math.floor(diff / 86400000);
-    if (days === 0) return 'Today';
+    if (days <= 0) return 'Today';
     if (days === 1) return 'Tomorrow';
     return new Date(date).toLocaleDateString('en-GB', { weekday: 'long' });
   }

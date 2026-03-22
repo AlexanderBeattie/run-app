@@ -58,13 +58,13 @@ describe('HomeComponent', () => {
 
   it('calls loadRuns on init', () => expect(runsService.loadRuns).toHaveBeenCalled());
 
-  it('shows correct initials for two-word name', () => {
-    expect(component.initials).toBe('AB');
+  it('firstName returns first word of display name', () => {
+    expect(component.firstName).toBe('Alex');
   });
 
-  it('shows single initial for one-word name', () => {
+  it('firstName returns full name when single word', () => {
     authService.getUser.mockReturnValue(signal({ displayName: 'Alex', role: 'runner' }));
-    expect(component.initials).toBe('A');
+    expect(component.firstName).toBe('Alex');
   });
 
   it('displays runs from service', () => {
@@ -73,31 +73,45 @@ describe('HomeComponent', () => {
     expect(runsService.getRuns()().length).toBe(2);
   });
 
-  it('calls loadRuns with filter params when setFilter is called', () => {
-    component.setFilter({ label: '5k+', params: { distance_min: 5 } });
+  it('calls loadRuns with filter params when setCategory is called', () => {
+    component.setCategory({ label: '5K', params: { distance_min: 5 } });
     expect(runsService.loadRuns).toHaveBeenCalledWith(expect.objectContaining({ distance_min: 5 }));
-    expect(component.activeFilter).toBe('5k+');
+    expect(component.activeCategory).toBe('5K');
   });
 
-  it('calls loadRuns with date param for Today filter', () => {
-    component.setFilter({ label: 'Today', params: { date: 'today' } });
+  it('calls loadRuns with date param for Today category', () => {
+    component.setCategory({ label: 'Today', params: { date: 'today' } });
     expect(runsService.loadRuns).toHaveBeenCalledWith(expect.objectContaining({ date: 'today' }));
   });
 
-  it('calls loadRuns with date param for This week filter', () => {
-    component.setFilter({ label: 'This week', params: { date: 'week' } });
-    expect(runsService.loadRuns).toHaveBeenCalledWith(expect.objectContaining({ date: 'week' }));
+  it('calls loadRuns with pace param for Easy category', () => {
+    component.setCategory({ label: 'Easy', params: { pace: 'easy' } });
+    expect(runsService.loadRuns).toHaveBeenCalledWith(expect.objectContaining({ pace: 'easy' }));
   });
 
-  it('calls loadRuns with distance_min for 10k+ filter', () => {
-    component.setFilter({ label: '10k+', params: { distance_min: 10 } });
-    expect(runsService.loadRuns).toHaveBeenCalledWith(expect.objectContaining({ distance_min: 10 }));
+  it('calls loadRuns with distance_min for 10K category', () => {
+    component.setCategory({ label: '10K', params: { distance_min: 8 } });
+    expect(runsService.loadRuns).toHaveBeenCalledWith(expect.objectContaining({ distance_min: 8 }));
   });
 
-  it('includes search query when setting filter', () => {
+  it('includes search query when setting category', () => {
     component.searchQuery = 'parkrun';
-    component.setFilter({ label: 'Today', params: { date: 'today' } });
+    component.setCategory({ label: 'Today', params: { date: 'today' } });
     expect(runsService.loadRuns).toHaveBeenCalledWith(expect.objectContaining({ date: 'today', search: 'parkrun' }));
+  });
+
+  it('hasActiveFilters is false by default', () => {
+    expect(component.hasActiveFilters).toBe(false);
+  });
+
+  it('hasActiveFilters is true when category is not All', () => {
+    component.setCategory({ label: 'Fast', params: { pace: 'fast' } });
+    expect(component.hasActiveFilters).toBe(true);
+  });
+
+  it('hasActiveFilters is true when search query is set', () => {
+    component.searchQuery = 'parkrun';
+    expect(component.hasActiveFilters).toBe(true);
   });
 
   it('sets loaded to true after timeout', async () => {

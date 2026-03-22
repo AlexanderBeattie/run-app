@@ -40,10 +40,6 @@ describe('RunsService', () => {
     expect(service.getRuns()()).toEqual([]);
   });
 
-  it('starts with no selected run', () => {
-    expect(service.getSelectedRunId()()).toBeNull();
-  });
-
   it('starts with no joined runs', () => {
     expect(service.getJoinedRunIds()()).toEqual([]);
   });
@@ -74,13 +70,6 @@ describe('RunsService', () => {
     service.loadRuns({ date: 'today' });
     const req = http.expectOne(r => r.params.get('date') === 'today');
     req.flush([]);
-  });
-
-  it('selectRun updates selectedRunId', () => {
-    service.selectRun('run-1');
-    expect(service.getSelectedRunId()()).toBe('run-1');
-    service.selectRun(null);
-    expect(service.getSelectedRunId()()).toBeNull();
   });
 
   it('formatDate returns Today for current date', () => {
