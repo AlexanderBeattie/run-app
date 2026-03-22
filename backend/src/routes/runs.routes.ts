@@ -53,11 +53,25 @@ router.get('/', async (req: Request, res: Response) => {
     }
 
     const where = conditions.join(' AND ');
+
+    // Determine ORDER BY clause based on ?trending=1
+    let orderByClause = 'r.event_date ASC';
+    if (req.query.trending === '1') {
+      conditions.push(`r.event_date > NOW() AND r.event_date <= NOW() + INTERVAL '72 hours'`);
+      orderByClause = '(SELECT COUNT(*) FROM run_attendees WHERE run_id = r.id) DESC';
+    }
+
     const result = await pool.query(`
-      SELECT r.*, COALESCE(json_agg(ra.user_id) FILTER (WHERE ra.user_id IS NOT NULL), '[]') AS attendees
-      FROM run_events r LEFT JOIN run_attendees ra ON ra.run_id = r.id
+      SELECT r.*,
+        c.name AS club_name,
+        c.city AS club_city,
+        c.created_at AS club_created_at,
+        COALESCE(json_agg(ra.user_id) FILTER (WHERE ra.user_id IS NOT NULL), '[]') AS attendees
+      FROM run_events r
+      LEFT JOIN run_attendees ra ON ra.run_id = r.id
+      LEFT JOIN clubs c ON r.club_id = c.id
       WHERE ${where}
-      GROUP BY r.id ORDER BY r.event_date ASC
+      GROUP BY r.id, c.id ORDER BY ${orderByClause}
     `, params);
     res.json(result.rows);
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
@@ -217,6 +231,42 @@ router.post('/:id/join', requireAuth, async (req: AuthRequest, res: Response) =>
       res.json({ joined: true });
     }
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+router.get('/:id/weather', async (req: Request, res: Response) => {
+  try {
+    const result = await pool.query('SELECT start_lat, start_lng, event_date FROM run_events WHERE id = $1', [req.params.id]);
+    if (!result.rows.length) { res.status(404).json({ error: 'Not found' }); return; }
+
+    const { start_lat, start_lng, event_date } = result.rows[0];
+    if (start_lat === null || start_lng === null) {
+      res.status(404).json({ error: 'Location data not available' });
+      return;
+    }
+
+    // Format date as YYYY-MM-DD for Open-Meteo API
+    const date = new Date(event_date).toISOString().split('T')[0];
+
+    const weatherResponse = await fetch(
+      `https://api.open-meteo.com/v1/forecast?latitude=${start_lat}&longitude=${start_lng}&daily=temperature_2m_max,weathercode&timezone=auto&start_date=${date}&end_date=${date}`
+    );
+
+    if (!weatherResponse.ok) {
+      res.status(500).json({ error: 'Failed to fetch weather' });
+      return;
+    }
+
+    const weatherData = await weatherResponse.json() as any;
+    const dailyData = weatherData.daily;
+
+    res.json({
+      temperature: dailyData.temperature_2m_max[0],
+      weathercode: dailyData.weathercode[0]
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
 });
 
 export default router;
