@@ -1,6 +1,6 @@
 # KLUB — Task Queue
 
-## Status: Phase 3 in progress — UI Polish & Deployment Prep
+## Status: Phase 3f in progress — Discovery Feed Frontend
 
 ### What's done
 - Phase 1: All tests passing, dev server boots clean
@@ -9,27 +9,22 @@
 - Phase 3b: Form validation (inline errors on create-run + create-club)
 - Phase 3c: Toasts wired to all actions (join/leave, create, cancel, delete)
 - Phase 3d: Organiser dashboard redesign (logout via avatar dropdown, Upcoming/Past/Cancelled tabs)
+- Phase 3e: UI polish — error states, loading skeletons, create-run label, mobile audit, confirm modals, club chip, edit-run pre-fill
+- Phase 3f backend: Denormalized runs payload (club_name, club_city, club_created_at), trending sort, weather endpoint
 
 ---
 
-## Active Sprint: Phase 3e — UI Polish (remaining)
+## Active Sprint: Phase 3f — Discovery Feed Frontend
 
-### Must-have before deployment
-- [ ] Mobile responsive audit — test all screens at 320px, fix overflow/wrapping issues
-- [ ] Error states — all API-calling screens need a visible error message on failure (not just console)
-  - HomeComponent (run feed)
-  - ClubListComponent
-  - ClubProfileComponent
-  - OrganiserHomeComponent
-  - RunnerProfileComponent
-- [ ] Loading skeletons on club list + club profile (currently blank while loading)
-- [ ] "Post as Club" label clarity on create-run — make it clear the run will appear under the club name
-
-### Nice-to-have polish
-- [ ] Visual distinction between club runs and independent runs on run cards (e.g. club tag chip)
-- [ ] Edit-run page: pre-fill form from existing run data (currently unclear if this works end-to-end)
-- [ ] Empty state illustration or icon on home feed when no runs match filters
-- [ ] Confirm dialogs → replace browser `confirm()` with in-app modal (better mobile UX)
+### Phase 3e completed items
+- [x] Mobile responsive audit — runner-profile + other screens audited at 320px
+- [x] Error states — all 5 API-calling screens have visible error banners (HomeComponent, ClubListComponent, ClubProfileComponent, OrganiserHomeComponent, RunnerProfileComponent)
+- [x] Loading skeletons on club list + club profile
+- [x] "Post as Club" label clarity on create-run
+- [x] Visual distinction between club runs and independent runs (club tag chip on run cards)
+- [x] Edit-run page: pre-fills from existing run data
+- [x] Empty state on home feed when no runs match filters
+- [x] Confirm dialogs → replaced browser `confirm()` with in-app ConfirmModalComponent
 
 ---
 
@@ -40,12 +35,12 @@
 ### Backend
 
 - [ ] Update `GET /api/runs` SQL to `LEFT JOIN clubs ON run_events.club_id = clubs.id`, return `club_name`, `club_city`, and `club_created_at` in each run row — eliminates N+1 club lookups in `HomeComponent`
-- [ ] Add `?trending=1` query param to `GET /api/runs` — sort by `(SELECT COUNT(*) FROM run_attendees WHERE run_id = run_events.id)` DESC, scoped to runs whose `event_date` is within the next 72h
+- [ ] Add `?trending=1` query param to `GET /api/runs` — return results sorted by attendee count DESC, scoped to runs whose `event_date` is within the next 72h; implement sort via JOIN or aggregation against `run_attendees` (not a correlated subquery per row)
 - [ ] Add `GET /api/runs/:id/weather` endpoint — proxy Open-Meteo free API using `start_lat` + `start_lng` from the `run_events` row and the run's `event_date`; return `temperature_2m` + `weathercode`; no API key required
 
 ### Home Feed — `HomeComponent`
 
-- [ ] Add horizontal clubs carousel above the run list — call existing `GET /api/clubs`, render as 64px initials circles in an `overflow-x: scroll` flex row; no logo images (initials from `club.name` only)
+- [ ] Add horizontal clubs carousel above the run list — call existing `GET /api/clubs`, render initials circles in an `overflow-x: scroll` flex row; no logo images (initials from `club.name` only); size should suit the carousel context
 - [ ] Add "Trending" carousel section — add `trending` boolean to `RunsService.getRuns()` params, pass `?trending=1`, render results in a horizontal-scroll row of `RunCardComponent`
 - [ ] Add "Happening This Weekend" carousel — compute the next Saturday and Sunday dates client-side (signal), pass as `?date_from=&date_to=` to a second `RunsService.getRuns()` call; render as horizontal carousel
 - [ ] Add category quick-filter pills — render pill buttons: 5K · Trail · Shakeout · Race · Social — each appends the corresponding value to `?tags=` on `GET /api/runs`; active pill tracked in a `signal<string | null>`
@@ -53,13 +48,13 @@
 
 ### Run Cards — `RunCardComponent`
 
-- [ ] Add facepile — display up to 3 overlapping 28px initials circles from `run.attendees[]`, derived from `attendee.display_name`; if `attendee_count > 3`, show `+N` label; requires attendees included in denormalized runs payload
-- [ ] Add dynamic badges — "Filling Fast" if `attendee_count / max_attendees >= 0.8`; "Beginner Friendly" if `pace === 'easy'` or `tags` includes `'beginner'`; "New Club" if `club_created_at` is within 30 days; computed with `computed()` signal
-- [ ] Add weather chip — call `GET /api/runs/:id/weather` on card render (with request deduplication), display temperature + WMO weather icon below the distance row; cache result in a component-level `signal`
+- [ ] Add facepile — display a small number of overlapping initials circles from `run.attendees[]`, derived from `attendee.display_name`; if more attendees exist than shown, display a `+N` overflow label; size and cap should suit the run card layout; requires attendees included in denormalized runs payload
+- [ ] Add dynamic badges — "Filling Fast" when signup rate approaches capacity (define threshold as a named constant e.g. `FILLING_FAST_THRESHOLD`); "Beginner Friendly" if `pace === 'easy'` or `tags` includes `'beginner'`; "New Club" when club was created recently (define as named constant e.g. `NEW_CLUB_DAYS`); computed with `computed()` signal
+- [ ] Add weather chip — fetch weather lazily (on card visibility, not on render) via `GET /api/runs/:id/weather`; deduplicate by caching result in a component-level `signal` — skip re-fetching if data already present; display temperature + WMO weather icon below the distance row
 
 ### Run Detail — `RunDetailDialogComponent`
 
-- [ ] Add Web Share button — call `navigator.share({ title: run.title, text: run.title, url: window.location.origin + '/runs/' + run.id })`; catch `NotSupportedError` and fall back to `navigator.clipboard.writeText(url)` + dispatch a "Link copied" toast via `ToastService`
+- [ ] Add Web Share button — call `navigator.share()` with the run title, a short descriptive text (e.g. "Join me for this run"), and the run URL (`window.location.origin + '/runs/' + run.id`); catch `NotSupportedError` and fall back to `navigator.clipboard.writeText(url)` + dispatch a "Link copied" toast via `ToastService`
 
 ---
 
@@ -109,7 +104,7 @@ Planned migration for scalability, real-time, and storage:
 
 - [ ] GPX route upload — **Prerequisite: Supabase Storage (Phase 5)**. Add `gpx_url TEXT` and `static_map_url TEXT` columns to `run_events`. Backend: `POST /api/runs/:id/gpx` accepts multipart upload, stores in Supabase bucket, generates static map image via Google Maps Static API, saves URL to DB.
 - [ ] Post-run photo recaps — **Prerequisite: Supabase Storage (Phase 5)**. New `run_photos` table (`run_id`, `photo_url`, `caption`, `uploaded_at`). Backend: `POST /api/runs/:id/photos` accepts multipart, stores in Supabase bucket. Frontend: photo gallery on run detail after `event_date` has passed.
-- [ ] PWA push notifications — **Prerequisite: Firebase Cloud Messaging integration**. Requires VAPID key pair, `@angular/service-worker` push config, backend `POST /api/push/subscribe` to store `PushSubscription` objects, and `web-push` npm package for server-sent notifications. Current `ngsw` config handles cache only — push is a separate implementation path.
+- [ ] PWA push notifications — **Prerequisite: VAPID-based push infrastructure**. Implement using Web Push standard (VAPID key pair, `web-push` npm package on backend); Firebase FCM is one option but not required — standards-based approach avoids vendor lock-in. Backend: `POST /api/push/subscribe` to store `PushSubscription` objects. Current `ngsw` config handles cache only — push is a separate implementation path.
 
 ---
 
@@ -134,7 +129,7 @@ Planned migration for scalability, real-time, and storage:
 ### Social (VIABLE SOON — can build without infrastructure)
 - [ ] Social graph / follow friends — new `user_follows (follower_id, followee_id, created_at)` table; `GET /api/users/:id/followers` + `POST /api/users/:id/follow`; follow button on club member profiles
 - [ ] Milestones & gamification — add `runs_joined_count INT DEFAULT 0` to `users` table (increment on join toggle); display achievement badges on `RunnerProfileComponent` using `computed()` signals (e.g. "Joined 10 runs", "Active in 3 clubs")
-- [ ] QR code check-ins — add `npm install qrcode` to backend; `GET /api/runs/:id/qr` returns SVG data URI; display on run detail for organisers; no storage required
+- [ ] QR code check-ins — backend generates a QR code for each run (`GET /api/runs/:id/qr`, returns SVG or data URI) using a suitable server-side QR generation library; display on run detail for organisers only; no storage required
 
 ### Algorithmic (DEFER — needs post-launch data)
 - [ ] Algorithmic pace matching — recommend runs based on user's historical pace + distance preferences; requires 3–6 months of `run_attendees` data before meaningful signal; consider pgvector extension on Supabase

@@ -120,29 +120,35 @@ describe('OrganiserHomeComponent', () => {
     expect(component.selectedRun).toBeNull();
   });
 
-  it('cancel calls cancelRun when confirmed', () => {
-    jest.spyOn(window, 'confirm').mockReturnValue(true);
+  it('cancel shows confirm modal with cancel mode', () => {
     component.runs = [makeRun({ id: 'run-1', status: 'active' })];
     component.cancel('run-1');
+    expect(component.confirmModal.mode).toBe('cancel');
+    expect(component.confirmModal.runId).toBe('run-1');
+  });
+
+  it('onConfirmed calls cancelRun when mode is cancel', () => {
+    component.confirmModal = { mode: 'cancel', runId: 'run-1', title: '', message: '', confirmLabel: '', destructive: false };
+    component.onConfirmed();
     expect(runsService.cancelRun).toHaveBeenCalledWith('run-1');
   });
 
-  it('cancel does nothing when user dismisses confirm', () => {
-    jest.spyOn(window, 'confirm').mockReturnValue(false);
-    component.cancel('run-1');
-    expect(runsService.cancelRun).not.toHaveBeenCalled();
+  it('onCancelledModal clears modal', () => {
+    component.confirmModal = { mode: 'cancel', runId: 'run-1', title: '', message: '', confirmLabel: '', destructive: false };
+    component.onCancelledModal();
+    expect(component.confirmModal.mode).toBeNull();
   });
 
-  it('delete calls deleteRun when confirmed', () => {
-    jest.spyOn(window, 'confirm').mockReturnValue(true);
+  it('delete shows confirm modal with delete mode', () => {
     component.runs = [makeRun({ id: 'run-1' })];
     component.delete('run-1');
-    expect(runsService.deleteRun).toHaveBeenCalledWith('run-1');
+    expect(component.confirmModal.mode).toBe('delete');
+    expect(component.confirmModal.runId).toBe('run-1');
   });
 
-  it('delete does nothing when user dismisses confirm', () => {
-    jest.spyOn(window, 'confirm').mockReturnValue(false);
-    component.delete('run-1');
-    expect(runsService.deleteRun).not.toHaveBeenCalled();
+  it('onConfirmed calls deleteRun when mode is delete', () => {
+    component.confirmModal = { mode: 'delete', runId: 'run-1', title: '', message: '', confirmLabel: '', destructive: true };
+    component.onConfirmed();
+    expect(runsService.deleteRun).toHaveBeenCalledWith('run-1');
   });
 });

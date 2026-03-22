@@ -35,5 +35,3 @@ frontend/.angular/
 # Logs
 *.log
 npm-debug.log*
-
-CLAUDE.md
