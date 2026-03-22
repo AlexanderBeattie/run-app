@@ -84,14 +84,14 @@ import { Club } from '../../core/models/run-event.model';
     </div>
   `,
     styles: [`
-    .page { background: #F7F7F5; min-height: 100%; }
-    .header { background: #0D0D0D; padding: 16px 20px 18px; display: flex; justify-content: space-between; align-items: center; }
+    .page { background: #F7F7F5; min-height: 100%; overflow-x: hidden; }
+    .header { background: #0D0D0D; padding: 16px 16px 18px; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
     .title { font-size: 18px; font-weight: 500; color: #fff; }
     .subtitle { font-size: 12px; color: rgba(255,255,255,0.5); margin-top: 2px; }
-    .create-btn { font-size: 13px; font-weight: 500; color: #1D9E75; text-decoration: none; background: rgba(29,158,117,0.15); padding: 8px 14px; border-radius: 8px; }
-    .search-row { padding: 14px 16px 0; }
-    .search-box { background: #fff; border: 0.5px solid rgba(0,0,0,0.1); border-radius: 12px; padding: 10px 14px; display: flex; align-items: center; gap: 10px; }
-    .search-box input { border: none; outline: none; font-size: 14px; font-family: inherit; flex: 1; background: transparent; color: #0D0D0D; }
+    .create-btn { font-size: 13px; font-weight: 500; color: #1D9E75; text-decoration: none; background: rgba(29,158,117,0.15); padding: 8px 12px; border-radius: 8px; white-space: nowrap; flex-shrink: 0; }
+    .search-row { padding: 14px 12px 0; }
+    .search-box { background: #fff; border: 0.5px solid rgba(0,0,0,0.1); border-radius: 12px; padding: 10px 12px; display: flex; align-items: center; gap: 8px; }
+    .search-box input { border: none; outline: none; font-size: 14px; font-family: inherit; flex: 1; background: transparent; color: #0D0D0D; min-width: 0; }
     .content { padding: 14px 12px 24px; }
 
     /* ── Error banner ─────────────────────────────────────────── */

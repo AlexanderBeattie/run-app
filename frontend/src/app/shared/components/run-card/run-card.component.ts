@@ -21,8 +21,10 @@ import { RunsService } from '../../../core/services/runs.service';
       </div>
 
       <div class="body">
-        <div class="club-row">{{ run.clubName || 'Independent run' }}</div>
         <div class="title">{{ run.title }}</div>
+        @if (run.club_name) {
+          <div class="club-chip">{{ run.club_name }}</div>
+        }
         <div class="meta-row">
           <span class="meta-text">{{ svc.formatDate(run.date) }} · {{ svc.formatTime(run.date) }}</span>
           @if (run.pace) { <span class="pace-chip">{{ run.pace }}</span> }
@@ -85,21 +87,23 @@ import { RunsService } from '../../../core/services/runs.service';
 
     .body { padding: 24px 16px 16px; }
 
-    .club-row {
-      font-size: 11px;
-      font-weight: 600;
-      color: #1D9E75;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      margin-bottom: 3px;
-    }
-
     .title {
       font-size: 16px;
       font-weight: 600;
       color: #0D0D0D;
       margin-bottom: 6px;
       line-height: 1.3;
+    }
+
+    .club-chip {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 600;
+      background: #E1F5EE;
+      color: #0F6E56;
+      border-radius: 999px;
+      padding: 4px 10px;
+      margin-bottom: 8px;
     }
 
     .meta-row {

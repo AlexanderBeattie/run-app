@@ -1,14 +1,15 @@
-import { Component, Input, Output, EventEmitter, inject, OnInit, AfterViewInit, ElementRef, ViewChild } from '@angular/core';
+import { Component, Input, Output, EventEmitter, inject, OnInit, AfterViewInit, ElementRef, ViewChild, ChangeDetectorRef, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { RunsService } from '../../core/services/runs.service';
 import { ToastService } from '../../shared/services/toast.service';
+import { ConfirmModalComponent } from '../../shared/components/confirm-modal/confirm-modal.component';
 
 declare const google: any;
 
 @Component({
   selector: 'app-run-organiser-dialog',
   standalone: true,
-  imports: [RouterLink],
+  imports: [RouterLink, ConfirmModalComponent],
   template: `
     <div class="overlay" (click)="onOverlay($event)">
       <div class="dialog">
@@ -59,6 +60,16 @@ declare const google: any;
         </div>
       </div>
     </div>
+
+    @if (confirmModal.mode !== null) {
+      <app-confirm-modal
+        [title]="confirmModal.title"
+        [message]="confirmModal.message"
+        [confirmLabel]="confirmModal.confirmLabel"
+        [destructive]="confirmModal.destructive"
+        (confirmed)="onConfirmed()"
+        (cancelled)="onCancelledModal()" />
+    }
   `,
   styles: [`
     .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: flex-end; justify-content: center; z-index: 500; }
@@ -110,7 +121,15 @@ export class RunOrganiserDialogComponent implements OnInit, AfterViewInit {
   @ViewChild('miniMap') miniMapEl!: ElementRef;
   svc = inject(RunsService);
   toast = inject(ToastService);
+  cdr = inject(ChangeDetectorRef);
   attendees: any[] = [];
+  confirmModal = {
+    mode: null as 'cancel' | 'delete' | null,
+    title: '',
+    message: '',
+    confirmLabel: '',
+    destructive: false
+  };
 
   get capacityPercent() {
     if (!this.run.max_attendees) return 0;
@@ -137,7 +156,50 @@ export class RunOrganiserDialogComponent implements OnInit, AfterViewInit {
   formatTime(date: string) { return new Date(date).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }); }
   formatJoinDate(date: string) { return new Date(date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }); }
 
-  onCancel() { if (!confirm('Cancel run?')) return; this.svc.cancelRun(this.run.id).subscribe(() => { this.toast.show('Run cancelled'); this.cancelled.emit(this.run.id); }); }
-  onDelete() { if (!confirm('Delete run?')) return; this.svc.deleteRun(this.run.id).subscribe(() => { this.toast.show('Run deleted'); this.deleted.emit(this.run.id); }); }
+  onCancel() {
+    this.confirmModal = {
+      mode: 'cancel',
+      title: 'Cancel run?',
+      message: 'This run will be marked as cancelled. Attendees will be notified.',
+      confirmLabel: 'Cancel run',
+      destructive: false
+    };
+    this.cdr.markForCheck();
+  }
+
+  onDelete() {
+    this.confirmModal = {
+      mode: 'delete',
+      title: 'Delete run?',
+      message: 'This action cannot be undone. The run will be permanently removed.',
+      confirmLabel: 'Delete',
+      destructive: true
+    };
+    this.cdr.markForCheck();
+  }
+
+  onConfirmed() {
+    if (this.confirmModal.mode === 'cancel') {
+      this.svc.cancelRun(this.run.id).subscribe(() => {
+        this.toast.show('Run cancelled');
+        this.cancelled.emit(this.run.id);
+        this.confirmModal.mode = null;
+        this.cdr.markForCheck();
+      });
+    } else if (this.confirmModal.mode === 'delete') {
+      this.svc.deleteRun(this.run.id).subscribe(() => {
+        this.toast.show('Run deleted');
+        this.deleted.emit(this.run.id);
+        this.confirmModal.mode = null;
+        this.cdr.markForCheck();
+      });
+    }
+  }
+
+  onCancelledModal() {
+    this.confirmModal.mode = null;
+    this.cdr.markForCheck();
+  }
+
   onOverlay(e: MouseEvent) { if ((e.target as HTMLElement).classList.contains('overlay')) this.close.emit(); }
 }

@@ -8,6 +8,7 @@ export interface RunEvent {
   attendees: string[]; maxAttendees?: number; notes?: string;
   status?: string; createdBy?: string;
   pace?: string; tags?: string[];
+  club_name?: string;
 }
 export interface KlubUser {
   id: string; displayName: string; email: string;

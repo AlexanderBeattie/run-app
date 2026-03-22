@@ -4,11 +4,12 @@ import { RunsService } from '../../core/services/runs.service';
 import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../shared/services/toast.service';
 import { RunOrganiserDialogComponent } from './run-organiser-dialog.component';
+import { ConfirmModalComponent } from '../../shared/components/confirm-modal/confirm-modal.component';
 
 @Component({
   selector: 'app-organiser-home',
   standalone: true,
-  imports: [RouterLink, RunOrganiserDialogComponent],
+  imports: [RouterLink, RunOrganiserDialogComponent, ConfirmModalComponent],
   template: `
     <div class="page" (click)="menuOpen && closeMenu($event)">
       <div class="header">
@@ -127,6 +128,16 @@ import { RunOrganiserDialogComponent } from './run-organiser-dialog.component';
         (cancelled)="onCancelled($event)"
         (deleted)="onDeleted($event)" />
     }
+
+    @if (confirmModal.mode !== null) {
+      <app-confirm-modal
+        [title]="confirmModal.title"
+        [message]="confirmModal.message"
+        [confirmLabel]="confirmModal.confirmLabel"
+        [destructive]="confirmModal.destructive"
+        (confirmed)="onConfirmed()"
+        (cancelled)="onCancelledModal()" />
+    }
   `,
   styles: [`
     .page { background: #0D0D0D; min-height: 100%; }
@@ -214,6 +225,14 @@ export class OrganiserHomeComponent implements OnInit {
   menuOpen = false;
   activeTab: 'upcoming' | 'past' | 'cancelled' = 'upcoming';
   errorMessage = signal<string | null>(null);
+  confirmModal = {
+    mode: null as 'cancel' | 'delete' | null,
+    title: '',
+    message: '',
+    confirmLabel: '',
+    destructive: false,
+    runId: ''
+  };
 
   get initials() { return (this.auth.getUser()()?.displayName ?? '').split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0,2); }
   get activeRuns() { return this.runs.filter(r => r.status !== 'cancelled').length; }
@@ -262,13 +281,50 @@ export class OrganiserHomeComponent implements OnInit {
   openDialog(run: any) { this.selectedRun = run; this.cdr.markForCheck(); }
 
   cancel(id: string) {
-    if (!confirm('Cancel this run?')) return;
-    this.svc.cancelRun(id).subscribe(() => { this.runs = this.runs.map(r => r.id === id ? { ...r, status: 'cancelled' } : r); this.toast.show('Run cancelled'); this.cdr.markForCheck(); });
+    this.confirmModal = {
+      mode: 'cancel',
+      title: 'Cancel run?',
+      message: 'This run will be marked as cancelled. Attendees will be notified.',
+      confirmLabel: 'Cancel run',
+      destructive: false,
+      runId: id
+    };
+    this.cdr.markForCheck();
   }
 
   delete(id: string) {
-    if (!confirm('Delete this run?')) return;
-    this.svc.deleteRun(id).subscribe(() => { this.runs = this.runs.filter(r => r.id !== id); this.toast.show('Run deleted'); this.cdr.markForCheck(); });
+    this.confirmModal = {
+      mode: 'delete',
+      title: 'Delete run?',
+      message: 'This action cannot be undone. The run will be permanently removed.',
+      confirmLabel: 'Delete',
+      destructive: true,
+      runId: id
+    };
+    this.cdr.markForCheck();
+  }
+
+  onConfirmed() {
+    if (this.confirmModal.mode === 'cancel') {
+      this.svc.cancelRun(this.confirmModal.runId).subscribe(() => {
+        this.runs = this.runs.map(r => r.id === this.confirmModal.runId ? { ...r, status: 'cancelled' } : r);
+        this.toast.show('Run cancelled');
+        this.confirmModal.mode = null;
+        this.cdr.markForCheck();
+      });
+    } else if (this.confirmModal.mode === 'delete') {
+      this.svc.deleteRun(this.confirmModal.runId).subscribe(() => {
+        this.runs = this.runs.filter(r => r.id !== this.confirmModal.runId);
+        this.toast.show('Run deleted');
+        this.confirmModal.mode = null;
+        this.cdr.markForCheck();
+      });
+    }
+  }
+
+  onCancelledModal() {
+    this.confirmModal.mode = null;
+    this.cdr.markForCheck();
   }
 
   onCancelled(id: string) { this.runs = this.runs.map(r => r.id === id ? { ...r, status: 'cancelled' } : r); this.toast.show('Run cancelled'); this.selectedRun = null; this.cdr.markForCheck(); }
