@@ -1,6 +1,7 @@
 import { Component, Input, Output, EventEmitter, inject, OnInit, AfterViewInit, ElementRef, ViewChild } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { RunsService } from '../../core/services/runs.service';
+import { ToastService } from '../../shared/services/toast.service';
 
 declare const google: any;
 
@@ -108,6 +109,7 @@ export class RunOrganiserDialogComponent implements OnInit, AfterViewInit {
   @Output() deleted = new EventEmitter<string>();
   @ViewChild('miniMap') miniMapEl!: ElementRef;
   svc = inject(RunsService);
+  toast = inject(ToastService);
   attendees: any[] = [];
 
   get capacityPercent() {
@@ -135,7 +137,7 @@ export class RunOrganiserDialogComponent implements OnInit, AfterViewInit {
   formatTime(date: string) { return new Date(date).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }); }
   formatJoinDate(date: string) { return new Date(date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }); }
 
-  onCancel() { if (!confirm('Cancel run?')) return; this.svc.cancelRun(this.run.id).subscribe(() => this.cancelled.emit(this.run.id)); }
-  onDelete() { if (!confirm('Delete run?')) return; this.svc.deleteRun(this.run.id).subscribe(() => this.deleted.emit(this.run.id)); }
+  onCancel() { if (!confirm('Cancel run?')) return; this.svc.cancelRun(this.run.id).subscribe(() => { this.toast.show('Run cancelled'); this.cancelled.emit(this.run.id); }); }
+  onDelete() { if (!confirm('Delete run?')) return; this.svc.deleteRun(this.run.id).subscribe(() => { this.toast.show('Run deleted'); this.deleted.emit(this.run.id); }); }
   onOverlay(e: MouseEvent) { if ((e.target as HTMLElement).classList.contains('overlay')) this.close.emit(); }
 }

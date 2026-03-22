@@ -18,7 +18,11 @@ import { ToastService } from '../../shared/services/toast.service';
         <div style="width:32px"></div>
       </div>
       <div class="form">
-        <div class="field"><label>Club name</label><input [(ngModel)]="name" placeholder="e.g. Glasgow Road Runners" /></div>
+        <div class="field">
+          <label>Club name</label>
+          <input [(ngModel)]="name" (blur)="nameTouched = true" [class.invalid]="nameTouched && !name" placeholder="e.g. Glasgow Road Runners" />
+          @if (nameTouched && !name) { <span class="field-error">Required</span> }
+        </div>
         <div class="field"><label>Description</label><textarea [(ngModel)]="description" rows="3" placeholder="What's your club about?"></textarea></div>
         <div class="field"><label>City</label><input [(ngModel)]="city" placeholder="e.g. Glasgow" /></div>
         <div class="field">
@@ -52,7 +56,9 @@ import { ToastService } from '../../shared/services/toast.service';
     label { font-size: 13px; font-weight: 500; color: #3D3D3B; }
     input, textarea { border: 1px solid rgba(0,0,0,0.12); border-radius: 10px; padding: 12px; font-size: 16px; font-family: inherit; color: #0D0D0D; outline: none; background: #fff; }
     input:focus, textarea:focus { border-color: #1D9E75; }
+    input.invalid { border-color: #A32D2D; }
     textarea { resize: vertical; }
+    .field-error { font-size: 12px; color: #A32D2D; margin-top: -2px; }
     .pace-options, .tag-options { display: flex; gap: 8px; flex-wrap: wrap; }
     .pace-btn, .tag-btn { border: 1px solid rgba(0,0,0,0.12); background: #fff; border-radius: 999px; padding: 8px 16px; font-size: 13px; font-weight: 500; cursor: pointer; font-family: inherit; color: #6B6B68; }
     .pace-btn.active, .tag-btn.active { background: #1D9E75; color: #E1F5EE; border-color: #1D9E75; }
@@ -66,7 +72,7 @@ export class CreateClubComponent {
     router = inject(Router);
     toast = inject(ToastService);
     name = ''; description = ''; city = ''; pace = ''; tags: string[] = [];
-    error = ''; loading = false;
+    error = ''; loading = false; nameTouched = false;
     paceOptions = ['Easy', 'Moderate', 'Fast', 'Mixed'];
     tagOptions = ['Road', 'Trail', 'Social', 'Intervals', 'Beginner', 'Long distance'];
 
@@ -76,7 +82,7 @@ export class CreateClubComponent {
     }
 
     submit() {
-        if (!this.name) { this.error = 'Club name is required.'; return; }
+        if (!this.name) { this.nameTouched = true; this.error = 'Club name is required.'; return; }
         this.loading = true; this.error = '';
         this.clubService.createClub({
             name: this.name, description: this.description || undefined,

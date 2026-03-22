@@ -1,6 +1,7 @@
 import { Component, inject, ViewChild, ElementRef, AfterViewInit, OnInit, signal } from '@angular/core';
 import { RunsService } from '../../core/services/runs.service';
 import { AuthService } from '../../core/services/auth.service';
+import { ToastService } from '../../shared/services/toast.service';
 import { RunDetailDialogComponent } from '../../shared/components/run-detail-dialog/run-detail-dialog.component';
 import { RunEvent } from '../../core/models/run-event.model';
 import { RouterLink } from '@angular/router';
@@ -97,6 +98,7 @@ export class MapViewComponent implements OnInit, AfterViewInit {
   @ViewChild('mapEl') mapEl!: ElementRef;
   runsService = inject(RunsService);
   auth = inject(AuthService);
+  toast = inject(ToastService);
   map: any;
   userMarker: any;
   sheetOpen = signal(false);
@@ -180,5 +182,9 @@ export class MapViewComponent implements OnInit, AfterViewInit {
   }
 
   openDialog(run: RunEvent) { this.dialogRun.set(run); this.sheetOpen.set(false); }
-  onJoin(runId: string) { this.runsService.toggleJoin(runId, this.auth.getUser()()?.id ?? 'guest'); }
+  onJoin(runId: string) {
+    const wasJoined = this.runsService.getJoinedRunIds()().includes(runId);
+    this.runsService.toggleJoin(runId, this.auth.getUser()()?.id ?? 'guest');
+    this.toast.show(wasJoined ? 'Left the run' : "You're in!");
+  }
 }
