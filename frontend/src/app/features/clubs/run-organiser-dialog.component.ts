@@ -143,9 +143,15 @@ export class RunOrganiserDialogComponent implements OnInit, AfterViewInit {
     if (typeof google === 'undefined' || !this.miniMapEl) return;
     const sl = { lat: parseFloat(this.run.start_lat), lng: parseFloat(this.run.start_lng) };
     const el = { lat: parseFloat(this.run.end_lat), lng: parseFloat(this.run.end_lng) };
-    const map = new google.maps.Map(this.miniMapEl.nativeElement, { center: sl, zoom: 13, disableDefaultUI: true, styles: [{ featureType: 'poi', stylers: [{ visibility: 'off' }] }] });
-    new google.maps.Marker({ position: sl, map, icon: { path: google.maps.SymbolPath.CIRCLE, scale: 8, fillColor: '#1D9E75', fillOpacity: 1, strokeColor: '#0F6E56', strokeWeight: 2 } });
-    new google.maps.Marker({ position: el, map, icon: { path: google.maps.SymbolPath.CIRCLE, scale: 8, fillColor: '#0D0D0D', fillOpacity: 1, strokeColor: '#0D0D0D', strokeWeight: 2 } });
+    const map = new google.maps.Map(this.miniMapEl.nativeElement, { center: sl, zoom: 13, disableDefaultUI: true, mapId: 'DEMO_MAP_ID', styles: [{ featureType: 'poi', stylers: [{ visibility: 'off' }] }] });
+    // Start marker with custom SVG-based circle
+    const startPin = document.createElement('div');
+    startPin.style.cssText = 'width: 16px; height: 16px; background: #1D9E75; border: 2px solid #0F6E56; border-radius: 50%;';
+    new google.maps.marker.AdvancedMarkerElement({ position: sl, map, title: 'Start', content: startPin });
+    // End marker with custom SVG-based circle
+    const endPin = document.createElement('div');
+    endPin.style.cssText = 'width: 16px; height: 16px; background: #0D0D0D; border: 2px solid #0D0D0D; border-radius: 50%;';
+    new google.maps.marker.AdvancedMarkerElement({ position: el, map, title: 'End', content: endPin });
     const ds = new google.maps.DirectionsService();
     const dr = new google.maps.DirectionsRenderer({ map, suppressMarkers: true, polylineOptions: { strokeColor: '#1D9E75', strokeWeight: 3 } });
     ds.route({ origin: sl, destination: el, travelMode: google.maps.TravelMode.WALKING }, (r: any, s: any) => { if (s === 'OK') dr.setDirections(r); });
