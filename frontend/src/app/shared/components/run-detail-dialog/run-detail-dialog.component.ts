@@ -2,6 +2,7 @@ import { Component, Input, Output, EventEmitter, inject, OnInit, AfterViewInit, 
 import { RunEvent } from '../../../core/models/run-event.model';
 import { RunsService } from '../../../core/services/runs.service';
 import { AuthService } from '../../../core/services/auth.service';
+import { ToastService } from '../../services/toast.service';
 
 declare const google: any;
 
@@ -39,13 +40,16 @@ declare const google: any;
         } @else {
           <div class="chips">
             @for (a of attendees; track a.id) {
-              <div class="chip"><div class="chip-av">{{ a.display_name[0].toUpperCase() }}</div><span>{{ a.display_name }}</span></div>
+              <div class="chip"><div class="chip-av">{{ a.display_name?.[0]?.toUpperCase() ?? '?' }}</div><span>{{ a.display_name }}</span></div>
             }
           </div>
         }
-        <button class="join-btn" [class.joined]="isJoined" (click)="join.emit(run.id)">
-          {{ isJoined ? "You're going — tap to unjoin" : "I'm coming" }}
-        </button>
+        <div class="action-row">
+          <button class="share-btn" (click)="share()">↗ Share</button>
+          <button class="join-btn" [class.joined]="isJoined" (click)="join.emit(run.id)">
+            {{ isJoined ? "You're going — tap to unjoin" : "I'm coming" }}
+          </button>
+        </div>
       </div>
     </div>
   `,
@@ -75,7 +79,9 @@ declare const google: any;
     .chip { display: flex; align-items: center; gap: 6px; background: #F7F7F5; border-radius: 999px; padding: 4px 12px 4px 4px; }
     .chip-av { width: 24px; height: 24px; border-radius: 50%; background: #E1F5EE; color: #0F6E56; font-size: 11px; font-weight: 500; display: flex; align-items: center; justify-content: center; }
     .chip span { font-size: 13px; color: #0D0D0D; }
-    .join-btn { width: 100%; background: #1D9E75; color: #E1F5EE; border: none; border-radius: 12px; padding: 16px; font-size: 16px; font-weight: 500; cursor: pointer; font-family: inherit; }
+    .action-row { display: flex; gap: 10px; }
+    .share-btn { background: #F7F7F5; color: #0D0D0D; border: none; border-radius: 12px; padding: 16px 20px; font-size: 15px; font-weight: 500; cursor: pointer; font-family: inherit; white-space: nowrap; }
+    .join-btn { flex: 1; background: #1D9E75; color: #E1F5EE; border: none; border-radius: 12px; padding: 16px; font-size: 16px; font-weight: 500; cursor: pointer; font-family: inherit; }
     .join-btn.joined { background: #F7F7F5; color: #6B6B68; }
     @media (min-width: 600px) {
       .overlay { align-items: center; padding: 20px; }
@@ -91,6 +97,7 @@ export class RunDetailDialogComponent implements OnInit, AfterViewInit {
   @ViewChild('miniMap') miniMapEl!: ElementRef;
   svc = inject(RunsService);
   auth = inject(AuthService);
+  toast = inject(ToastService);
   attendees: { id: string; display_name: string }[] = [];
 
   ngOnInit() { this.svc.getAttendees(this.run.id).subscribe(d => this.attendees = d); }
@@ -113,4 +120,22 @@ export class RunDetailDialogComponent implements OnInit, AfterViewInit {
   }
 
   onOverlay(e: MouseEvent) { if ((e.target as HTMLElement).classList.contains('overlay')) this.close.emit(); }
+
+  async share() {
+    const url = window.location.href;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: this.run.title, text: `Join me for a run: ${this.run.title}`, url });
+      } catch (e: any) {
+        if (e.name !== 'AbortError') { await this.copyToClipboard(url); }
+      }
+    } else {
+      await this.copyToClipboard(url);
+    }
+  }
+
+  private async copyToClipboard(text: string) {
+    try { await navigator.clipboard.writeText(text); this.toast.show('Link copied!'); }
+    catch { this.toast.show('Unable to share'); }
+  }
 }

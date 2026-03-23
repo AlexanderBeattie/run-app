@@ -1,6 +1,10 @@
-import { Component, Input, Output, EventEmitter, inject } from '@angular/core';
+import { Component, Input, Output, EventEmitter, inject, OnInit, signal, DestroyRef } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RunEvent } from '../../../core/models/run-event.model';
 import { RunsService } from '../../../core/services/runs.service';
+
+const FILLING_FAST_THRESHOLD = 0.8;
+const NEW_CLUB_DAYS = 30;
 
 @Component({
   selector: 'app-run-card',
@@ -17,6 +21,11 @@ import { RunsService } from '../../../core/services/runs.service';
                   stroke="rgba(255,255,255,0.9)" stroke-width="2.5"/>
         </svg>
         <div class="dist-pill">{{ run.distanceKm }}km</div>
+        <div class="badge-row">
+          @if (isFillingFast) { <div class="badge badge-orange">🔥 Filling fast</div> }
+          @if (isBeginnerFriendly) { <div class="badge badge-green">🌿 Beginner friendly</div> }
+          @if (isNewClub) { <div class="badge badge-blue">✨ New club</div> }
+        </div>
         <div class="club-badge">{{ (run.clubName || '?')[0].toUpperCase() }}</div>
       </div>
 
@@ -28,14 +37,26 @@ import { RunsService } from '../../../core/services/runs.service';
         <div class="meta-row">
           <span class="meta-text">{{ svc.formatDate(run.date) }} · {{ svc.formatTime(run.date) }}</span>
           @if (run.pace) { <span class="pace-chip">{{ run.pace }}</span> }
+          @if (weatherData()) {
+            <span class="weather-chip">{{ weatherEmoji(weatherData()!.weathercode) }} {{ weatherData()!.temperature_2m }}°C</span>
+          }
         </div>
         <div class="footer">
-          <div class="going">
-            <div class="going-dot"></div>
-            {{ run.attendees.length }} going
+          <div class="facepile">
+            @for (a of facepileAttendees; track a.id) {
+              <div class="fp-circle" [title]="a.display_name">{{ a.display_name[0]?.toUpperCase() || '?' }}</div>
+            }
+            @if (extraCount > 0) {
+              <div class="fp-circle fp-extra">+{{ extraCount }}</div>
+            }
+            @if (run.attendees.length > 0) {
+              <span class="going-label">{{ run.attendees.length }} going</span>
+            } @else {
+              <span class="going-label no-going">Be the first</span>
+            }
           </div>
           <button class="join-btn" [class.joined]="isJoined" (click)="onJoin($event)">
-            {{ isJoined ? '✓ Going' : "I\'m coming" }}
+            {{ isJoined ? '✓ Going' : "I'm coming" }}
           </button>
         </div>
       </div>
@@ -56,8 +77,7 @@ import { RunsService } from '../../../core/services/runs.service';
 
     .route-svg {
       position: absolute;
-      bottom: 28px;
-      left: 0; right: 0;
+      bottom: 28px; left: 0; right: 0;
       width: 100%; height: 70px;
     }
 
@@ -69,10 +89,28 @@ import { RunsService } from '../../../core/services/runs.service';
       color: #fff;
       border-radius: 999px;
       padding: 4px 12px;
-      font-size: 13px;
-      font-weight: 600;
+      font-size: 13px; font-weight: 600;
       letter-spacing: 0.02em;
     }
+
+    .badge-row {
+      position: absolute;
+      top: 12px; left: 12px;
+      display: flex; gap: 5px;
+      flex-wrap: wrap;
+      max-width: calc(100% - 90px);
+    }
+
+    .badge {
+      font-size: 11px; font-weight: 600;
+      border-radius: 999px;
+      padding: 3px 8px;
+      backdrop-filter: blur(6px);
+      white-space: nowrap;
+    }
+    .badge-orange { background: rgba(239,94,0,0.85); color: #fff; }
+    .badge-green  { background: rgba(29,158,117,0.85); color: #fff; }
+    .badge-blue   { background: rgba(59,130,246,0.85); color: #fff; }
 
     .club-badge {
       position: absolute;
@@ -88,91 +126,126 @@ import { RunsService } from '../../../core/services/runs.service';
     .body { padding: 24px 16px 16px; }
 
     .title {
-      font-size: 16px;
-      font-weight: 600;
-      color: #0D0D0D;
-      margin-bottom: 6px;
-      line-height: 1.3;
+      font-size: 16px; font-weight: 600; color: #0D0D0D;
+      margin-bottom: 6px; line-height: 1.3;
     }
 
     .club-chip {
       display: inline-block;
-      font-size: 11px;
-      font-weight: 600;
-      background: #E1F5EE;
-      color: #0F6E56;
+      font-size: 11px; font-weight: 600;
+      background: #E1F5EE; color: #0F6E56;
       border-radius: 999px;
-      padding: 4px 10px;
-      margin-bottom: 8px;
+      padding: 4px 10px; margin-bottom: 8px;
     }
 
     .meta-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 14px;
-      flex-wrap: wrap;
+      display: flex; align-items: center;
+      gap: 8px; margin-bottom: 14px; flex-wrap: wrap;
     }
 
     .meta-text { font-size: 13px; color: #6B6B68; }
 
     .pace-chip {
-      font-size: 11px;
-      font-weight: 500;
-      background: #F7F7F5;
-      color: #6B6B68;
-      border-radius: 999px;
-      padding: 2px 8px;
+      font-size: 11px; font-weight: 500;
+      background: #F7F7F5; color: #6B6B68;
+      border-radius: 999px; padding: 2px 8px;
       text-transform: capitalize;
+    }
+
+    .weather-chip {
+      font-size: 11px; font-weight: 500;
+      background: #EFF6FF; color: #2563EB;
+      border-radius: 999px; padding: 2px 8px;
     }
 
     .footer { display: flex; justify-content: space-between; align-items: center; }
 
-    .going {
-      font-size: 13px;
-      color: #6B6B68;
-      display: flex; align-items: center; gap: 5px;
-    }
+    .facepile { display: flex; align-items: center; gap: 2px; }
 
-    .going-dot {
-      width: 7px; height: 7px;
+    .fp-circle {
+      width: 26px; height: 26px;
       border-radius: 50%;
-      background: #1D9E75;
+      background: #E1F5EE; color: #0F6E56;
+      font-size: 10px; font-weight: 600;
+      display: flex; align-items: center; justify-content: center;
+      border: 2px solid #fff;
+      margin-left: -6px;
     }
+    .facepile .fp-circle:first-child { margin-left: 0; }
+    .fp-extra { background: #F7F7F5; color: #6B6B68; font-size: 9px; }
+
+    .going-label {
+      font-size: 12px; color: #6B6B68;
+      margin-left: 6px; white-space: nowrap;
+    }
+    .no-going { color: #B0B0AE; }
 
     .join-btn {
-      background: #0D0D0D;
-      color: #fff;
-      border: none;
-      border-radius: 999px;
+      background: #0D0D0D; color: #fff;
+      border: none; border-radius: 999px;
       padding: 9px 18px;
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-      font-family: inherit;
+      font-size: 13px; font-weight: 600;
+      cursor: pointer; font-family: inherit;
       transition: opacity 0.15s;
     }
     .join-btn:active { opacity: 0.8; }
     .join-btn.joined { background: #E1F5EE; color: #0F6E56; }
   `]
 })
-export class RunCardComponent {
+export class RunCardComponent implements OnInit {
   @Input() run!: RunEvent;
   @Input() isJoined = false;
   @Output() cardClick = new EventEmitter<RunEvent>();
   @Output() joinToggle = new EventEmitter<string>();
 
   svc = inject(RunsService);
+  private destroyRef = inject(DestroyRef);
+  weatherData = signal<{ temperature_2m: number; weathercode: number } | null>(null);
+
+  ngOnInit() {
+    this.svc.getWeather(this.run.id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: d => this.weatherData.set(d),
+      error: (e) => console.error('Failed to load weather', e)
+    });
+  }
+
+  get facepileAttendees() { return this.run.attendees.slice(0, 3); }
+  get extraCount() { return Math.max(0, this.run.attendees.length - 3); }
+
+  get isFillingFast(): boolean {
+    if (!this.run.maxAttendees) return false;
+    return this.run.attendees.length / this.run.maxAttendees >= FILLING_FAST_THRESHOLD;
+  }
+
+  get isBeginnerFriendly(): boolean {
+    return this.run.pace === 'easy' || this.run.pace === 'social' ||
+      (this.run.tags ?? []).some(t => ['beginner', 'shakeout'].includes(t.toLowerCase()));
+  }
+
+  get isNewClub(): boolean {
+    if (!this.run.club_created_at) return false;
+    return (Date.now() - new Date(this.run.club_created_at).getTime()) / 86400000 <= NEW_CLUB_DAYS;
+  }
+
+  weatherEmoji(code: number): string {
+    if (code === 0) return '☀️';
+    if (code <= 2) return '🌤️';
+    if (code <= 49) return '🌥️';
+    if (code <= 69) return '🌧️';
+    if (code <= 79) return '❄️';
+    if (code <= 99) return '⛈️';
+    return '🌡️';
+  }
 
   get bannerGradient(): string {
-    const gradients: Record<string, string> = {
+    const g: Record<string, string> = {
       easy:     'linear-gradient(135deg, #1D9E75 0%, #0a5c42 100%)',
       social:   'linear-gradient(135deg, #10B981 0%, #065f46 100%)',
       moderate: 'linear-gradient(135deg, #3B82F6 0%, #1e3a8a 100%)',
       fast:     'linear-gradient(135deg, #EF4444 0%, #7f1d1d 100%)',
       tempo:    'linear-gradient(135deg, #F59E0B 0%, #78350f 100%)',
     };
-    return gradients[this.run.pace ?? ''] ?? 'linear-gradient(135deg, #1D9E75 0%, #0D0D0D 100%)';
+    return g[this.run.pace ?? ''] ?? 'linear-gradient(135deg, #1D9E75 0%, #0D0D0D 100%)';
   }
 
   onJoin(e: Event) {

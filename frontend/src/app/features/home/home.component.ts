@@ -3,10 +3,11 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { RunsService } from '../../core/services/runs.service';
 import { AuthService } from '../../core/services/auth.service';
+import { ClubService } from '../../core/services/club.service';
 import { ToastService } from '../../shared/services/toast.service';
 import { RunCardComponent } from '../../shared/components/run-card/run-card.component';
 import { RunDetailDialogComponent } from '../../shared/components/run-detail-dialog/run-detail-dialog.component';
-import { RunEvent } from '../../core/models/run-event.model';
+import { RunEvent, Club } from '../../core/models/run-event.model';
 import { Subject, debounceTime, distinctUntilChanged } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
@@ -72,6 +73,65 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
         }
       </div>
 
+      <!-- Clubs carousel -->
+      @if (clubs().length > 0) {
+        <div class="section-header">
+          <span class="section-title">Run Clubs</span>
+          <a class="section-link" routerLink="/clubs">See all</a>
+        </div>
+        <div class="clubs-carousel">
+          @for (club of clubs(); track club.id) {
+            <a class="club-card" [routerLink]="['/clubs', club.id]">
+              <div class="club-av" [style.background]="clubColor(club.id)">{{ club.name[0].toUpperCase() }}</div>
+              <div class="club-name">{{ club.name }}</div>
+              <div class="club-meta">{{ club.member_count }} members</div>
+            </a>
+          }
+        </div>
+      }
+
+      <!-- Trending carousel -->
+      @if (trendingRuns().length > 0) {
+        <div class="section-header">
+          <span class="section-title">🔥 Trending</span>
+        </div>
+        <div class="h-carousel">
+          @for (run of trendingRuns(); track run.id) {
+            <div class="h-card" (click)="openDialog(run)">
+              <div class="h-banner" [style.background]="gradientForPace(run.pace)">
+                <div class="h-dist">{{ run.distanceKm }}km</div>
+                <div class="h-going">{{ run.attendees.length }} going</div>
+              </div>
+              <div class="h-body">
+                <div class="h-title">{{ run.title }}</div>
+                <div class="h-date">{{ runsService.formatDate(run.date) }}</div>
+              </div>
+            </div>
+          }
+        </div>
+      }
+
+      <!-- This weekend carousel -->
+      @if (weekendRuns().length > 0) {
+        <div class="section-header">
+          <span class="section-title">📅 This Weekend</span>
+        </div>
+        <div class="h-carousel">
+          @for (run of weekendRuns(); track run.id) {
+            <div class="h-card" (click)="openDialog(run)">
+              <div class="h-banner" [style.background]="gradientForPace(run.pace)">
+                <div class="h-dist">{{ run.distanceKm }}km</div>
+                <div class="h-going">{{ run.attendees.length }} going</div>
+              </div>
+              <div class="h-body">
+                <div class="h-title">{{ run.title }}</div>
+                <div class="h-date">{{ runsService.formatDate(run.date) }}</div>
+              </div>
+            </div>
+          }
+        </div>
+      }
+
       <!-- Error message -->
       @if (errorMessage()) {
         <div class="error-banner">
@@ -84,13 +144,19 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
         </div>
       }
 
-      <!-- Feed section -->
+      <!-- Feed header with My Clubs toggle -->
       <div class="feed-header">
-        @if (loaded) {
-          <span class="feed-count">{{ runsService.getRuns()().length }} runs near you</span>
-        } @else {
-          <span class="feed-count">Finding runs...</span>
-        }
+        <div class="feed-header-top">
+          @if (loaded) {
+            <span class="feed-count">{{ runsService.getRuns()().length }} runs near you</span>
+          } @else {
+            <span class="feed-count">Finding runs...</span>
+          }
+          <div class="feed-toggle">
+            <button class="toggle-btn" [class.toggle-active]="feedMode() === 'all'" (click)="setFeedMode('all')">All</button>
+            <button class="toggle-btn" [class.toggle-active]="feedMode() === 'mine'" (click)="setFeedMode('mine')">My Clubs</button>
+          </div>
+        </div>
       </div>
 
       <div class="feed-surface">
@@ -226,7 +292,6 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
       align-items: center;
       justify-content: center;
       transition: transform 0.15s ease;
-      position: relative;
     }
     .cat-tile:active { transform: scale(0.93); }
     .cat-tile.cat-active {
@@ -246,13 +311,145 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
       font-weight: 700;
     }
 
+    /* ── Section headers ─────────────────────────────────────── */
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 20px 12px;
+    }
+    .section-title {
+      font-size: 17px;
+      font-weight: 700;
+      color: #0D0D0D;
+      letter-spacing: -0.2px;
+    }
+    .section-link {
+      font-size: 13px;
+      font-weight: 500;
+      color: #1D9E75;
+      text-decoration: none;
+    }
+
+    /* ── Clubs carousel ─────────────────────────────────────── */
+    .clubs-carousel {
+      display: flex;
+      gap: 12px;
+      padding: 0 16px 24px;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    .clubs-carousel::-webkit-scrollbar { display: none; }
+
+    .club-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      flex-shrink: 0;
+      cursor: pointer;
+      text-decoration: none;
+      width: 72px;
+    }
+    .club-av {
+      width: 56px; height: 56px;
+      border-radius: 18px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px; font-weight: 700; color: #fff;
+    }
+    .club-name {
+      font-size: 11px; font-weight: 600; color: #0D0D0D;
+      text-align: center;
+      max-width: 70px;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .club-meta {
+      font-size: 10px; color: #9B9B98;
+      text-align: center;
+    }
+
+    /* ── Horizontal run carousel ─────────────────────────────── */
+    .h-carousel {
+      display: flex;
+      gap: 12px;
+      padding: 0 16px 24px;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    .h-carousel::-webkit-scrollbar { display: none; }
+
+    .h-card {
+      flex-shrink: 0;
+      width: 200px;
+      background: #fff;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.07), 0 0 0 0.5px rgba(0,0,0,0.06);
+      cursor: pointer;
+    }
+    .h-banner {
+      height: 90px;
+      position: relative;
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      padding: 8px 10px;
+    }
+    .h-dist {
+      background: rgba(0,0,0,0.28);
+      backdrop-filter: blur(6px);
+      color: #fff;
+      border-radius: 999px;
+      padding: 3px 9px;
+      font-size: 12px; font-weight: 600;
+    }
+    .h-going {
+      font-size: 11px; font-weight: 500; color: rgba(255,255,255,0.9);
+    }
+    .h-body { padding: 10px 10px 12px; }
+    .h-title {
+      font-size: 13px; font-weight: 600; color: #0D0D0D;
+      margin-bottom: 3px;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .h-date { font-size: 11px; color: #9B9B98; }
+
     /* ── Feed ───────────────────────────────────────────────── */
     .feed-header { padding: 0 20px 14px; }
+    .feed-header-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
     .feed-count {
       font-size: 17px;
       font-weight: 700;
       color: #0D0D0D;
       letter-spacing: -0.2px;
+    }
+
+    .feed-toggle {
+      display: flex;
+      gap: 2px;
+      background: #F7F7F5;
+      border-radius: 999px;
+      padding: 3px;
+    }
+    .toggle-btn {
+      background: none;
+      border: none;
+      border-radius: 999px;
+      padding: 5px 12px;
+      font-size: 12px; font-weight: 500;
+      color: #9B9B98;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 0.15s, color 0.15s;
+    }
+    .toggle-btn.toggle-active {
+      background: #fff;
+      color: #0D0D0D;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     }
 
     .feed-surface {
@@ -313,12 +510,17 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 export class HomeComponent implements OnInit {
   runsService = inject(RunsService);
   auth = inject(AuthService);
+  clubService = inject(ClubService);
   toast = inject(ToastService);
   cdr = inject(ChangeDetectorRef);
   destroyRef = inject(DestroyRef);
 
   selectedRun = signal<RunEvent | null>(null);
   errorMessage = signal<string | null>(null);
+  trendingRuns = signal<RunEvent[]>([]);
+  weekendRuns = signal<RunEvent[]>([]);
+  clubs = signal<Club[]>([]);
+  feedMode = signal<'all' | 'mine'>('all');
   loaded = false;
   searchQuery = '';
   activeCategory = 'All';
@@ -326,15 +528,20 @@ export class HomeComponent implements OnInit {
   private searchSubject = new Subject<string>();
   private currentParams: any = {};
 
+  private readonly clubColours = [
+    '#1D9E75', '#3B82F6', '#F59E0B', '#EC4899',
+    '#8B5CF6', '#EF4444', '#10B981', '#6366F1',
+  ];
+
   categories = [
-    { label: 'All',    emoji: '🏃',  bg: '#0D0D0D', params: {} },
-    { label: '5K',     emoji: '🎯',  bg: '#3B82F6', params: { distance_min: 3 } },
-    { label: '10K',    emoji: '💪',  bg: '#8B5CF6', params: { distance_min: 8 } },
-    { label: 'Half',   emoji: '🏅',  bg: '#F59E0B', params: { distance_min: 18 } },
-    { label: 'Social', emoji: '👥',  bg: '#EC4899', params: { pace: 'social' } },
-    { label: 'Easy',   emoji: '🌿',  bg: '#1D9E75', params: { pace: 'easy' } },
-    { label: 'Fast',   emoji: '⚡',  bg: '#EF4444', params: { pace: 'fast' } },
-    { label: 'Today',  emoji: '📅',  bg: '#6366F1', params: { date: 'today' } },
+    { label: 'All',      emoji: '🏃', bg: '#0D0D0D', params: {} },
+    { label: '5K',       emoji: '🎯', bg: '#3B82F6', params: { tags: '5k' } },
+    { label: 'Trail',    emoji: '🌲', bg: '#10B981', params: { tags: 'trail' } },
+    { label: 'Race',     emoji: '🏅', bg: '#F59E0B', params: { tags: 'race' } },
+    { label: 'Social',   emoji: '👥', bg: '#EC4899', params: { pace: 'social' } },
+    { label: 'Shakeout', emoji: '🌿', bg: '#1D9E75', params: { tags: 'shakeout' } },
+    { label: 'Easy',     emoji: '😌', bg: '#6366F1', params: { pace: 'easy' } },
+    { label: 'Fast',     emoji: '⚡', bg: '#EF4444', params: { pace: 'fast' } },
   ];
 
   get timeOfDay(): string {
@@ -354,10 +561,32 @@ export class HomeComponent implements OnInit {
 
   ngOnInit() {
     this.loadWithParams();
+    this.loadCarousels();
     this.searchSubject.pipe(debounceTime(300), distinctUntilChanged(), takeUntilDestroyed(this.destroyRef)).subscribe(q => {
       this.currentParams = { ...this.currentParams, search: q || undefined };
       this.loadWithParams();
     });
+  }
+
+  private loadCarousels() {
+    this.clubService.listClubs().subscribe({ next: clubs => this.clubs.set(clubs.slice(0, 12)), error: (e) => console.error('Failed to load clubs carousel', e) });
+
+    this.runsService.fetchRuns({ trending: true }).subscribe({ next: runs => this.trendingRuns.set(runs.slice(0, 8)), error: (e) => console.error('Failed to load trending runs', e) });
+
+    const { dateFrom, dateTo } = this.getWeekendDates();
+    this.runsService.fetchRuns({ date_from: dateFrom, date_to: dateTo }).subscribe({ next: runs => this.weekendRuns.set(runs.slice(0, 8)), error: (e) => console.error('Failed to load weekend runs', e) });
+  }
+
+  private getWeekendDates(): { dateFrom: string; dateTo: string } {
+    const now = new Date();
+    const day = now.getDay();
+    const daysToSat = day === 6 ? 0 : (6 - day);
+    const sat = new Date(now);
+    sat.setDate(now.getDate() + daysToSat);
+    const sun = new Date(sat);
+    sun.setDate(sat.getDate() + 1);
+    const fmt = (d: Date) => d.toISOString().split('T')[0];
+    return { dateFrom: fmt(sat), dateTo: fmt(sun) };
   }
 
   onSearchChange(q: string) {
@@ -369,6 +598,27 @@ export class HomeComponent implements OnInit {
     this.currentParams = { ...cat.params };
     if (this.searchQuery) this.currentParams.search = this.searchQuery;
     this.loadWithParams();
+  }
+
+  setFeedMode(mode: 'all' | 'mine') {
+    this.feedMode.set(mode);
+    if (mode === 'mine') {
+      this.clubService.getMineClubs().subscribe({
+        next: myClubs => {
+          if (myClubs.length === 0) {
+            this.runsService.loadRuns({ ...this.currentParams });
+          } else {
+            const clubIds = myClubs.map(c => c.id).join(',');
+            this.runsService.loadRuns({ ...this.currentParams, club_ids: clubIds });
+          }
+          setTimeout(() => { this.loaded = true; this.cdr.markForCheck(); }, 400);
+        },
+        error: () => this.loadWithParams()
+      });
+      this.loaded = false;
+    } else {
+      this.loadWithParams();
+    }
   }
 
   private loadWithParams() {
@@ -383,5 +633,22 @@ export class HomeComponent implements OnInit {
     this.runsService.toggleJoin(runId, this.auth.getUser()()?.id ?? 'guest');
     const isJoined = this.runsService.getJoinedRunIds()().includes(runId);
     this.toast.show(isJoined ? 'Left the run' : "You're in!");
+  }
+
+  gradientForPace(pace?: string): string {
+    const g: Record<string, string> = {
+      easy:     'linear-gradient(135deg, #1D9E75 0%, #0a5c42 100%)',
+      social:   'linear-gradient(135deg, #10B981 0%, #065f46 100%)',
+      moderate: 'linear-gradient(135deg, #3B82F6 0%, #1e3a8a 100%)',
+      fast:     'linear-gradient(135deg, #EF4444 0%, #7f1d1d 100%)',
+      tempo:    'linear-gradient(135deg, #F59E0B 0%, #78350f 100%)',
+    };
+    return g[pace ?? ''] ?? 'linear-gradient(135deg, #1D9E75 0%, #0D0D0D 100%)';
+  }
+
+  clubColor(clubId: string): string {
+    let hash = 0;
+    for (let i = 0; i < clubId.length; i++) { hash = (hash * 31 + clubId.charCodeAt(i)) >>> 0; }
+    return this.clubColours[hash % this.clubColours.length];
   }
 }

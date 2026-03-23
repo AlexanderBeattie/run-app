@@ -43,4 +43,8 @@ export class ClubService {
     getMyClubs() {
         return this.http.get<Club[]>(`${environment.apiUrl}/clubs/owned`);
     }
+
+    getMineClubs() {
+        return this.http.get<Club[]>(`${environment.apiUrl}/clubs/mine`);
+    }
 }

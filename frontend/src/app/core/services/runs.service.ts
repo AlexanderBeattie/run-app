@@ -1,5 +1,6 @@
 import { Injectable, signal, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { map } from 'rxjs/operators';
 import { RunEvent, CreateRunPayload } from '../models/run-event.model';
 import { environment } from '../../../environments/environment';
 
@@ -22,20 +23,48 @@ export class RunsService {
       estimatedMinutes: r.estimated_minutes, attendees: r.attendees ?? [],
       maxAttendees: r.max_attendees, notes: r.notes,
       status: r.status, createdBy: r.created_by,
-      pace: r.pace, tags: r.tags
+      pace: r.pace, tags: r.tags,
+      club_name: r.club_name, club_created_at: r.club_created_at
     };
   }
 
-  loadRuns(params?: { search?: string; distance_min?: number; date?: string; city?: string; pace?: string }) {
+  loadRuns(params?: {
+    search?: string; distance_min?: number; date?: string; city?: string;
+    pace?: string; trending?: boolean; tags?: string; club_ids?: string;
+  }) {
     const queryParams: any = {};
     if (params?.search) queryParams.search = params.search;
     if (params?.distance_min) queryParams.distance_min = params.distance_min;
     if (params?.date) queryParams.date = params.date;
     if (params?.city) queryParams.city = params.city;
     if (params?.pace) queryParams.pace = params.pace;
+    if (params?.trending) queryParams.trending = 1;
+    if (params?.tags) queryParams.tags = params.tags;
+    if (params?.club_ids) queryParams.club_ids = params.club_ids;
     return this.http.get<any[]>(`${environment.apiUrl}/runs`, { params: queryParams }).subscribe(data => {
       this.runs.set(data.map(r => this.mapRun(r)));
     });
+  }
+
+  fetchRuns(params?: {
+    search?: string; distance_min?: number; date?: string; city?: string;
+    pace?: string; trending?: boolean; tags?: string; club_ids?: string;
+    date_from?: string; date_to?: string;
+  }) {
+    const queryParams: any = {};
+    if (params?.search) queryParams.search = params.search;
+    if (params?.distance_min) queryParams.distance_min = params.distance_min;
+    if (params?.date) queryParams.date = params.date;
+    if (params?.city) queryParams.city = params.city;
+    if (params?.pace) queryParams.pace = params.pace;
+    if (params?.trending) queryParams.trending = 1;
+    if (params?.tags) queryParams.tags = params.tags;
+    if (params?.club_ids) queryParams.club_ids = params.club_ids;
+    if (params?.date_from) queryParams.date_from = params.date_from;
+    if (params?.date_to) queryParams.date_to = params.date_to;
+    return this.http.get<any[]>(`${environment.apiUrl}/runs`, { params: queryParams }).pipe(
+      map(data => data.map(r => this.mapRun(r)))
+    );
   }
 
   getMyRuns() { return this.http.get<any[]>(`${environment.apiUrl}/runs/mine`); }
@@ -46,15 +75,23 @@ export class RunsService {
     return this.http.get<{ id: string; display_name: string; joined_at: string }[]>(`${environment.apiUrl}/runs/${runId}/attendees`);
   }
 
+  getWeather(runId: string) {
+    return this.http.get<{ temperature_2m: number; weathercode: number }>(`${environment.apiUrl}/runs/${runId}/weather`);
+  }
+
   toggleJoin(runId: string, userId: string) {
     this.http.post<{ joined: boolean }>(`${environment.apiUrl}/runs/${runId}/join`, {}).subscribe(res => {
       const joined = this.joinedRunIds();
       if (res.joined) {
         this.joinedRunIds.set([...joined, runId]);
-        this.runs.update(runs => runs.map(r => r.id === runId ? { ...r, attendees: [...r.attendees, userId] } : r));
+        this.runs.update(runs => runs.map(r => r.id === runId
+          ? { ...r, attendees: [...r.attendees, { id: userId, display_name: '' }] }
+          : r));
       } else {
         this.joinedRunIds.set(joined.filter(id => id !== runId));
-        this.runs.update(runs => runs.map(r => r.id === runId ? { ...r, attendees: r.attendees.filter(a => a !== userId) } : r));
+        this.runs.update(runs => runs.map(r => r.id === runId
+          ? { ...r, attendees: r.attendees.filter(a => a.id !== userId) }
+          : r));
       }
     });
   }
