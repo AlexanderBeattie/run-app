@@ -1,0 +1,23 @@
+# Netlify configuration for KLUB PWA
+
+# Headers for PWA and service worker
+[[headers]]
+  for = "/manifest.webmanifest"
+  [headers.values]
+    Content-Type = "application/manifest+json"
+
+[[headers]]
+  for = "/ngsw.json"
+  [headers.values]
+    Content-Type = "application/json"
+
+[[headers]]
+  for = "/ngsw-worker.js"
+  [headers.values]
+    Content-Type = "application/javascript"
+
+# Build configuration
+[build]
+  command = "npm run build:frontend"
+  functions = "backend/dist"
+  publish = "frontend/dist/temp"
