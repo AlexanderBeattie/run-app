@@ -18,6 +18,6 @@
 
 # Build configuration
 [build]
+  base = "frontend"
   command = "npm run build:frontend"
-  functions = "backend/dist"
-  publish = "frontend/dist/temp"
+  publish = "dist/temp/browser"
