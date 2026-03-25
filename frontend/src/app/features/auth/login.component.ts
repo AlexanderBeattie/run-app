@@ -20,6 +20,7 @@ import { AuthService } from '../../core/services/auth.service';
         <div class="field"><label>Password</label><input type="password" [(ngModel)]="password" placeholder="••••••••" (keyup.enter)="login()" autocomplete="current-password" /></div>
         @if (error) { <div class="error">{{ error }}</div> }
         <button class="submit" (click)="login()">Log in</button>
+        <p class="forgot"><a routerLink="/forgot-password">Forgot password?</a></p>
         <p class="switch">Don't have an account? <a routerLink="/register">Join KLUB</a></p>
       </div>
     </div>
@@ -38,6 +39,8 @@ import { AuthService } from '../../core/services/auth.service';
     input:focus { border-color: #1D9E75; background: #fff; }
     .error { background: #FCEBEB; color: #A32D2D; border-radius: 10px; padding: 12px; font-size: 14px; margin-bottom: 14px; }
     .submit { width: 100%; background: #1D9E75; color: #E1F5EE; border: none; border-radius: 12px; padding: 16px; font-size: 16px; font-weight: 500; cursor: pointer; font-family: inherit; margin-bottom: 16px; }
+    .forgot { font-size: 14px; color: #6B6B68; text-align: center; margin-bottom: 12px; }
+    .forgot a { color: #1D9E75; font-weight: 500; }
     .switch { font-size: 14px; color: #6B6B68; text-align: center; }
     .switch a { color: #1D9E75; font-weight: 500; }
   `]

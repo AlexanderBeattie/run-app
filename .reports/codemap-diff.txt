@@ -1,0 +1,204 @@
+KLUB CODEMAP GENERATION REPORT
+Generated: 2026-03-22
+
+========== SUMMARY ==========
+
+Monorepo Codemaps generated for KLUB (run club discovery platform).
+New directory: docs/CODEMAPS/
+5 token-lean documentation files created.
+
+Total tokens scanned: ~1,780 (average ~356 per file, well under 1000 target)
+Total lines analyzed: ~830 across backend/frontend/db/config files
+
+========== FILES CREATED ==========
+
+1. docs/CODEMAPS/architecture.md (380 tokens)
+   ├─ System overview diagram (Browser ← HTTP → API ← TCP → PostgreSQL)
+   ├─ Monorepo structure (frontend/, backend/, tasks/, package.json)
+   ├─ Data flow narrative: auth → runs → clubs (3 core flows)
+   ├─ Middleware stack (express.json, cors, route mounting)
+   ├─ Key dependencies table (express, pg, bcryptjs, jsonwebtoken, cors)
+   ├─ Deployment targets (Netlify, Render, Render PostgreSQL)
+   └─ Cross-references to backend.md, frontend.md, data.md, dependencies.md
+
+2. docs/CODEMAPS/backend.md (420 tokens)
+   ├─ Complete route tree (auth, runs, clubs, geocode, health)
+   ├─ Per-endpoint implementation details
+   │  ├─ POST /auth/register (bcrypt hash, JWT sign, 201 Created)
+   │  ├─ POST /auth/login (bcrypt compare, JWT sign)
+   │  ├─ GET /runs (dynamic WHERE builder, json_agg attendees)
+   │  ├─ GET/POST /clubs (owner/member queries, toggle join)
+   │  ├─ POST /runs/:id/join (toggle attendees, local state)
+   │  └─ GET /geocode (Google API proxy)
+   ├─ Middleware chain diagram with requireAuth details
+   ├─ Database connection startup (pool.query health check)
+   ├─ File organization table (56 lines index.ts, ~240 runs.routes.ts, etc.)
+   ├─ Error handling pattern (try/catch, status codes)
+   └─ Cross-references
+
+3. docs/CODEMAPS/frontend.md (410 tokens)
+   ├─ Route tree with guards (authGuard, organizerGuard)
+   │  ├─ Static routes before parameterized (e.g., /clubs/create before /clubs/:id)
+   │  ├─ /login, /register (no guard)
+   │  ├─ /home, /map, /clubs, /profile (authGuard)
+   │  ├─ /clubs/create, /clubs/create-run, /organiser (organizerGuard)
+   │  └─ Catch-all redirect to /home
+   ├─ Component hierarchy (Auth, Home/Feed, Map, Clubs, Profile)
+   │  ├─ AppComponent shell (RouterOutlet, ToastComponent, BottomNavComponent)
+   │  ├─ 6 feature modules with full component tree
+   │  └─ Shared components (RunCardComponent, RunDetailDialogComponent, BottomNav, Toast)
+   ├─ Service descriptions (AuthService, RunsService, ClubService, GeocodingService)
+   │  ├─ Signal-based state (currentUser, runs, joinedRunIds, myClubIds)
+   │  ├─ HTTP methods (GET /api/runs, POST /api/clubs/:id/join, etc.)
+   │  └─ Helper methods (formatDate, formatTime, mapRun)
+   ├─ Guard & interceptor details
+   │  ├─ authGuard (checks isLoggedIn)
+   │  ├─ organizerGuard (checks role === 'organizer')
+   │  └─ jwtInterceptor (attaches Bearer token, handles 401)
+   ├─ App configuration (DI providers, service worker)
+   ├─ File organization (~36 lines app.component, ~19 lines routes, 17 lines config)
+   └─ Cross-references
+
+4. docs/CODEMAPS/data.md (320 tokens)
+   ├─ ER diagram (users → clubs, clubs → club_members ← users, runs → attendees)
+   ├─ 5 table definitions with all columns, types, constraints
+   │  ├─ users (id, display_name, email, password_hash, role, strava_connected, created_at)
+   │  ├─ clubs (id, name, description, owner_id, city, pace, tags, logo_url, member_count, created_at)
+   │  ├─ club_members (club_id, user_id, role, joined_at) — FK constraints
+   │  ├─ run_events (id, club_id, title, start/end_lat/lng, addresses, event_date, distance_km, estimated_minutes, max_attendees, notes, status, pace, tags, created_by, created_at)
+   │  └─ run_attendees (run_id, user_id, joined_at) — composite PK
+   ├─ Query patterns (3 examples: list runs with attendees, club ownership check, list clubs with metadata)
+   ├─ Constraints & integrity table (role CHECK, FK CASCADE, composite PKs)
+   ├─ Migrations: schema.sql (initial 4 tables) + migration-001.sql (club_members, club/run columns)
+   ├─ Performance notes (denormalized club_name, computed member_count, json_agg expense, no declared indexes)
+   └─ Cross-references
+
+5. docs/CODEMAPS/dependencies.md (280 tokens)
+   ├─ Environment variables table (7 vars: GOOGLE_MAPS_API_KEY, PORT, DATABASE_URL, JWT_SECRET, JWT_EXPIRES_IN, CORS_ORIGIN, GOOGLE_SERVER_API_KEY)
+   ├─ Backend dependencies (6 prod: express, pg, bcryptjs, jsonwebtoken, cors, dotenv + dev tools)
+   ├─ Frontend dependencies (11 prod: Angular @17.3, rxjs, tslib, zone.js + dev tools)
+   ├─ Root monorepo config (npm workspaces, rxjs override, concurrently, pinned TypeScript)
+   ├─ Build process (2 pipelines: frontend with generate-env.js, backend with tsc)
+   ├─ Testing configuration (backend: node env, frontend: jsdom with jest-preset-angular@14)
+   ├─ Version pinning strategy table
+   ├─ External services (Google APIs: Maps JS browser + Geocoding server proxy, PostgreSQL on Render)
+   ├─ Script commands reference (npm run dev, build:frontend, test, etc.)
+   └─ Cross-references
+
+========== COVERAGE SUMMARY ==========
+
+BACKEND (src/)
+✓ index.ts — Express setup, CORS, route mounting, health check
+✓ routes/auth.routes.ts — Register, login with bcrypt + JWT
+✓ routes/runs.routes.ts — CRUD + filters + join toggle + club ownership enforcement
+✓ routes/clubs.routes.ts — CRUD + membership + ownership verification
+✓ routes/geocode.routes.ts — Google Geocoding proxy
+✓ middleware/auth.middleware.ts — JWT verification
+✓ db/schema.sql — 4-table schema (users, clubs, run_events, run_attendees)
+✓ db/migration-001.sql — club_members table + columns (city, pace, tags)
+
+FRONTEND (src/app/)
+✓ app.component.ts — Root shell, RouterOutlet, bottom nav logic
+✓ app.routes.ts — 11 routes (lazy loaded), 2 guards (authGuard, organizerGuard)
+✓ app.config.ts — DI providers (router, httpClient, service worker)
+✓ core/services/auth.service.ts — Session signal, login/register/logout
+✓ core/services/runs.service.ts — Runs signal, filters, join toggle, mapRun
+✓ core/services/club.service.ts — Clubs signal, membership toggle, ownership check
+✓ core/services/geocoding.service.ts — Address geocoding via API
+✓ core/models/run-event.model.ts — 5 interfaces (RunEvent, KlubUser, CreateRunPayload, Club, ClubMember)
+✓ core/guards/auth.guard.ts — Functional CanActivateFn checking isLoggedIn
+✓ core/guards/organizer.guard.ts — Functional CanActivateFn checking role
+✓ core/interceptors/jwt.interceptor.ts — HttpInterceptorFn for Bearer token + 401 handling
+✓ features/auth/* — LoginComponent, RegisterComponent
+✓ features/clubs/* — 7 components (list, profile, create, create-run, edit-run, organiser-home, run-organiser-dialog)
+✓ features/home/home.component.ts — Feed with search/filters, RunCardComponent array
+✓ features/map/map-view.component.ts — Google Maps integration, MarkerClusterer
+✓ features/profile/runner-profile.component.ts — User profile, joined runs
+✓ shared/components/run-card/ — Reusable run card with join button
+✓ shared/components/run-detail-dialog/ — Bottom sheet run detail
+✓ shared/components/bottom-nav/ — 4-tab nav (home, map, clubs, profile/organiser)
+✓ shared/components/toast/ — Toast notifications
+✓ shared/services/toast.service.ts — Signal-based toast state
+✓ environments/environment.ts — apiUrl + googleMapsApiKey
+
+CONFIGURATION
+✓ package.json (root) — Monorepo workspaces, concurrently, TypeScript pinning
+✓ backend/package.json — Jest config, dependencies
+✓ frontend/package.json — Jest config, dependencies
+✓ .env (root) — All 7 environment variables (gitignored, documented)
+
+========== KEY PATTERNS DOCUMENTED ==========
+
+Architecture
+├─ HTTP REST API with Express
+├─ Angular 17 standalone components with signals
+├─ PostgreSQL relational schema
+├─ JWT-based authentication (7d expiry)
+├─ CORS with configurable origin
+└─ PWA with service worker for offline support
+
+Backend
+├─ Dynamic query builder for run filters (ILIKE, date ranges, aggregates)
+├─ Club ownership enforcement via club_members.role = 'owner'
+├─ Run attachment validation (only owner/organizer can create club runs)
+├─ json_agg aggregation for attendee lists
+├─ Server-side Google API proxy (keeps secrets secure)
+└─ Parameterized queries (SQL injection prevention)
+
+Frontend
+├─ Signal-based reactive state (currentUser, runs, joinedRunIds)
+├─ Functional route guards (authGuard, organizerGuard)
+├─ Lazy-loaded components with loadComponent
+├─ JWT interceptor with auto-logout on 401
+├─ Run detail dialog (bottom sheet modal)
+├─ Toast notifications (signal-driven)
+├─ Standalone components with inject()
+└─ Address geocoding on input blur
+
+Data
+├─ Denormalized club_name in run_events (query optimization)
+├─ Composite PKs for junction tables (club_members, run_attendees)
+├─ FK CASCADE for data integrity
+├─ Nullable club_id in run_events (independent runs)
+├─ UUID primary keys with uuid_generate_v4()
+└─ TIMESTAMP with DEFAULT NOW() for audit trails
+
+========== CROSS-DOCUMENT LINKS ==========
+
+Each file includes "Related Codemaps" section with links:
+├─ architecture.md → backend.md, frontend.md, data.md, dependencies.md
+├─ backend.md → architecture.md, data.md, dependencies.md
+├─ frontend.md → architecture.md, backend.md, dependencies.md
+├─ data.md → backend.md, architecture.md
+└─ dependencies.md → architecture.md, backend.md, frontend.md
+
+========== VALIDATION NOTES ==========
+
+All paths verified to exist:
+✓ /Users/alexbeattie/Downloads/klub/backend/src/index.ts (56 lines)
+✓ /Users/alexbeattie/Downloads/klub/backend/src/routes/auth.routes.ts (33 lines)
+✓ /Users/alexbeattie/Downloads/klub/backend/src/routes/runs.routes.ts (~240 lines)
+✓ /Users/alexbeattie/Downloads/klub/backend/src/routes/clubs.routes.ts (~150 lines)
+✓ /Users/alexbeattie/Downloads/klub/backend/src/routes/geocode.routes.ts (26 lines)
+✓ /Users/alexbeattie/Downloads/klub/backend/src/middleware/auth.middleware.ts (11 lines)
+✓ /Users/alexbeattie/Downloads/klub/backend/src/db/schema.sql (49 lines)
+✓ /Users/alexbeattie/Downloads/klub/backend/src/db/migration-001.sql (21 lines)
+✓ /Users/alexbeattie/Downloads/klub/frontend/src/app/app.routes.ts (19 lines)
+✓ /Users/alexbeattie/Downloads/klub/frontend/src/app/app.component.ts (36 lines)
+✓ /Users/alexbeattie/Downloads/klub/frontend/src/app/core/services/auth.service.ts (46 lines)
+✓ /Users/alexbeattie/Downloads/klub/frontend/src/app/core/services/runs.service.ts (78 lines)
+✓ /Users/alexbeattie/Downloads/klub/frontend/src/app/core/services/club.service.ts (46 lines)
+
+All API endpoints verified against route files and documented.
+All database tables, columns, and constraints extracted from SQL.
+All environment variables cross-referenced in code.
+All component paths extracted from glob (no test files included).
+
+========== FRESHNESS TIMESTAMP ==========
+
+All 5 files include header:
+<!-- Generated: 2026-03-22 | Files scanned: N | Token estimate: ~N -->
+
+Token estimates verified to be under 1000 per file (max 420).
+
+========== END REPORT ==========

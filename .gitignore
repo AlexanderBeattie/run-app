@@ -35,3 +35,6 @@ frontend/.angular/
 # Logs
 *.log
 npm-debug.log*
+
+# Personal
+_claude.md

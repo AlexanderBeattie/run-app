@@ -1,13 +1,15 @@
-import { Component, Input, Output, EventEmitter, inject, OnInit, AfterViewInit, ElementRef, ViewChild } from '@angular/core';
+import { Component, Input, Output, EventEmitter, inject, OnInit, AfterViewInit, ElementRef, ViewChild, ChangeDetectorRef, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { RunsService } from '../../core/services/runs.service';
+import { ToastService } from '../../shared/services/toast.service';
+import { ConfirmModalComponent } from '../../shared/components/confirm-modal/confirm-modal.component';
 
 declare const google: any;
 
 @Component({
   selector: 'app-run-organiser-dialog',
   standalone: true,
-  imports: [RouterLink],
+  imports: [RouterLink, ConfirmModalComponent],
   template: `
     <div class="overlay" (click)="onOverlay($event)">
       <div class="dialog">
@@ -42,7 +44,7 @@ declare const google: any;
           <div class="attendee-list">
             @for (a of attendees; track a.id) {
               <div class="attendee-row">
-                <div class="av">{{ a.display_name[0].toUpperCase() }}</div>
+                <div class="av">{{ a.display_name?.[0]?.toUpperCase() || '?' }}</div>
                 <span class="aname">{{ a.display_name }}</span>
                 <span class="adate">{{ formatJoinDate(a.joined_at) }}</span>
               </div>
@@ -58,6 +60,16 @@ declare const google: any;
         </div>
       </div>
     </div>
+
+    @if (confirmModal.mode !== null) {
+      <app-confirm-modal
+        [title]="confirmModal.title"
+        [message]="confirmModal.message"
+        [confirmLabel]="confirmModal.confirmLabel"
+        [destructive]="confirmModal.destructive"
+        (confirmed)="onConfirmed()"
+        (cancelled)="onCancelledModal()" />
+    }
   `,
   styles: [`
     .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: flex-end; justify-content: center; z-index: 500; }
@@ -108,7 +120,16 @@ export class RunOrganiserDialogComponent implements OnInit, AfterViewInit {
   @Output() deleted = new EventEmitter<string>();
   @ViewChild('miniMap') miniMapEl!: ElementRef;
   svc = inject(RunsService);
+  toast = inject(ToastService);
+  cdr = inject(ChangeDetectorRef);
   attendees: any[] = [];
+  confirmModal = {
+    mode: null as 'cancel' | 'delete' | null,
+    title: '',
+    message: '',
+    confirmLabel: '',
+    destructive: false
+  };
 
   get capacityPercent() {
     if (!this.run.max_attendees) return 0;
@@ -122,9 +143,15 @@ export class RunOrganiserDialogComponent implements OnInit, AfterViewInit {
     if (typeof google === 'undefined' || !this.miniMapEl) return;
     const sl = { lat: parseFloat(this.run.start_lat), lng: parseFloat(this.run.start_lng) };
     const el = { lat: parseFloat(this.run.end_lat), lng: parseFloat(this.run.end_lng) };
-    const map = new google.maps.Map(this.miniMapEl.nativeElement, { center: sl, zoom: 13, disableDefaultUI: true, styles: [{ featureType: 'poi', stylers: [{ visibility: 'off' }] }] });
-    new google.maps.Marker({ position: sl, map, icon: { path: google.maps.SymbolPath.CIRCLE, scale: 8, fillColor: '#1D9E75', fillOpacity: 1, strokeColor: '#0F6E56', strokeWeight: 2 } });
-    new google.maps.Marker({ position: el, map, icon: { path: google.maps.SymbolPath.CIRCLE, scale: 8, fillColor: '#0D0D0D', fillOpacity: 1, strokeColor: '#0D0D0D', strokeWeight: 2 } });
+    const map = new google.maps.Map(this.miniMapEl.nativeElement, { center: sl, zoom: 13, disableDefaultUI: true, mapId: 'DEMO_MAP_ID', styles: [{ featureType: 'poi', stylers: [{ visibility: 'off' }] }] });
+    // Start marker with custom SVG-based circle
+    const startPin = document.createElement('div');
+    startPin.style.cssText = 'width: 16px; height: 16px; background: #1D9E75; border: 2px solid #0F6E56; border-radius: 50%;';
+    new google.maps.marker.AdvancedMarkerElement({ position: sl, map, title: 'Start', content: startPin });
+    // End marker with custom SVG-based circle
+    const endPin = document.createElement('div');
+    endPin.style.cssText = 'width: 16px; height: 16px; background: #0D0D0D; border: 2px solid #0D0D0D; border-radius: 50%;';
+    new google.maps.marker.AdvancedMarkerElement({ position: el, map, title: 'End', content: endPin });
     const ds = new google.maps.DirectionsService();
     const dr = new google.maps.DirectionsRenderer({ map, suppressMarkers: true, polylineOptions: { strokeColor: '#1D9E75', strokeWeight: 3 } });
     ds.route({ origin: sl, destination: el, travelMode: google.maps.TravelMode.WALKING }, (r: any, s: any) => { if (s === 'OK') dr.setDirections(r); });
@@ -135,7 +162,50 @@ export class RunOrganiserDialogComponent implements OnInit, AfterViewInit {
   formatTime(date: string) { return new Date(date).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }); }
   formatJoinDate(date: string) { return new Date(date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }); }
 
-  onCancel() { if (!confirm('Cancel run?')) return; this.svc.cancelRun(this.run.id).subscribe(() => this.cancelled.emit(this.run.id)); }
-  onDelete() { if (!confirm('Delete run?')) return; this.svc.deleteRun(this.run.id).subscribe(() => this.deleted.emit(this.run.id)); }
+  onCancel() {
+    this.confirmModal = {
+      mode: 'cancel',
+      title: 'Cancel run?',
+      message: 'This run will be marked as cancelled. Attendees will be notified.',
+      confirmLabel: 'Cancel run',
+      destructive: false
+    };
+    this.cdr.markForCheck();
+  }
+
+  onDelete() {
+    this.confirmModal = {
+      mode: 'delete',
+      title: 'Delete run?',
+      message: 'This action cannot be undone. The run will be permanently removed.',
+      confirmLabel: 'Delete',
+      destructive: true
+    };
+    this.cdr.markForCheck();
+  }
+
+  onConfirmed() {
+    if (this.confirmModal.mode === 'cancel') {
+      this.svc.cancelRun(this.run.id).subscribe(() => {
+        this.toast.show('Run cancelled');
+        this.cancelled.emit(this.run.id);
+        this.confirmModal.mode = null;
+        this.cdr.markForCheck();
+      });
+    } else if (this.confirmModal.mode === 'delete') {
+      this.svc.deleteRun(this.run.id).subscribe(() => {
+        this.toast.show('Run deleted');
+        this.deleted.emit(this.run.id);
+        this.confirmModal.mode = null;
+        this.cdr.markForCheck();
+      });
+    }
+  }
+
+  onCancelledModal() {
+    this.confirmModal.mode = null;
+    this.cdr.markForCheck();
+  }
+
   onOverlay(e: MouseEvent) { if ((e.target as HTMLElement).classList.contains('overlay')) this.close.emit(); }
 }
