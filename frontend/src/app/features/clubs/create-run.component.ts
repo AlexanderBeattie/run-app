@@ -72,17 +72,30 @@ import { Club } from '../../core/models/run-event.model';
         <div class="field-row">
           <div class="field">
             <label>Distance (km)</label>
-            <input type="number" [(ngModel)]="distanceKm" placeholder="8" />
+            <input type="number" [value]="distanceKm || ''" readonly class="readonly" placeholder="Auto-calculated" />
           </div>
           <div class="field">
-            <label>Est. mins</label>
-            <input type="number" [(ngModel)]="estimatedMinutes" placeholder="50" />
+            <label>Est. time</label>
+            <input type="text" [value]="estimatedTimeLabel" readonly class="readonly" placeholder="Auto-calculated" />
           </div>
         </div>
 
         <div class="field">
           <label>Max attendees</label>
           <input type="number" [(ngModel)]="maxAttendees" placeholder="Optional" />
+        </div>
+
+        <div class="field">
+          <label>Run type <span class="optional">(optional)</span></label>
+          <div class="type-pills">
+            @for (t of runTypes; track t.value) {
+              <button type="button" class="type-pill"
+                [class.active]="runType === t.value"
+                (click)="runType = runType === t.value ? null : t.value">
+                {{ t.emoji }} {{ t.label }}
+              </button>
+            }
+          </div>
         </div>
 
         <div class="field">
@@ -130,10 +143,21 @@ import { Club } from '../../core/models/run-event.model';
     }
     input:focus, textarea:focus, select:focus { border-color: #1D9E75; }
     input.invalid, textarea.invalid { border-color: #A32D2D; }
+    input.readonly { background: #F7F7F5; color: #6B6B68; cursor: default; }
     textarea { resize: vertical; }
     .field-error { font-size: 12px; color: #A32D2D; margin-top: -2px; }
     .error { background: #FCEBEB; color: #A32D2D; border-radius: 10px; padding: 12px; font-size: 14px; }
     .info { background: #E1F5EE; color: #0F6E56; border-radius: 10px; padding: 12px; font-size: 14px; }
+    .optional { font-weight: 400; color: #9B9B98; }
+    .type-pills { display: flex; flex-wrap: wrap; gap: 8px; }
+    .type-pill {
+      background: #fff; border: 1.5px solid rgba(0,0,0,0.12);
+      border-radius: 999px; padding: 7px 14px;
+      font-size: 13px; font-weight: 500; font-family: inherit;
+      color: #3D3D3B; cursor: pointer;
+      transition: background 0.12s, border-color 0.12s, color 0.12s;
+    }
+    .type-pill.active { background: #1D9E75; border-color: #1D9E75; color: #fff; }
     .submit { background: #1D9E75; color: #E1F5EE; border: none; border-radius: 12px; padding: 16px; font-size: 16px; font-weight: 500; cursor: pointer; font-family: inherit; width: 100%; }
     .submit:disabled { opacity: 0.6; }
   `]
@@ -155,8 +179,34 @@ export class CreateRunComponent implements OnInit {
   estimatedMinutes = 0;
   maxAttendees?: number;
   notes = '';
+  runType: string | null = null;
   error = '';
   loading = false;
+
+  readonly runTypes = [
+    { value: 'club_run',       label: 'Club Run',   emoji: '🏃' },
+    { value: 'parkrun_style',  label: 'Parkrun',    emoji: '🅿️' },
+    { value: 'one_off_race',   label: 'Race',       emoji: '🏅' },
+    { value: 'training_group', label: 'Training',   emoji: '💪' },
+    { value: 'trail_run',      label: 'Trail',      emoji: '🌲' },
+  ];
+
+  get estimatedTimeLabel(): string {
+    if (!this.estimatedMinutes) return '';
+    const h = Math.floor(this.estimatedMinutes / 60);
+    const m = this.estimatedMinutes % 60;
+    return h > 0 ? `${h}h ${m}m` : `${m}m`;
+  }
+
+  private haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) ** 2 +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLng / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
 
   touched = { title: false, startAddress: false, endAddress: false, date: false, time: false };
 
@@ -203,6 +253,10 @@ export class CreateRunComponent implements OnInit {
       return;
     }
 
+    const rawKm = this.haversineKm(sl.lat, sl.lng, el.lat, el.lng);
+    this.distanceKm = Math.round(rawKm * 10) / 10;
+    this.estimatedMinutes = Math.round(this.distanceKm * 6);
+
     this.runsService.createRun({
       clubId: this.selectedClubId,
       clubName: '',
@@ -215,7 +269,8 @@ export class CreateRunComponent implements OnInit {
       distanceKm: this.distanceKm,
       estimatedMinutes: this.estimatedMinutes,
       maxAttendees: this.maxAttendees,
-      notes: this.notes
+      notes: this.notes,
+      runType: this.runType ?? undefined
     }).subscribe({
       next: () => { this.toast.show('Run posted!'); this.router.navigate(['/organiser']); },
       error: () => {

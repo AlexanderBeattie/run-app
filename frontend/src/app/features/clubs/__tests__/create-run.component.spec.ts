@@ -128,9 +128,7 @@ describe('CreateRunComponent', () => {
       startAddress: 'Victoria Park',
       endAddress: 'Canary Wharf',
       startLocation: mockCoords,
-      endLocation: mockCoords,
-      distanceKm: 8,
-      estimatedMinutes: 50
+      endLocation: mockCoords
     }));
   });
 

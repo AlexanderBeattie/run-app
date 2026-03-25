@@ -44,7 +44,7 @@ declare const google: any;
           <div class="attendee-list">
             @for (a of attendees; track a.id) {
               <div class="attendee-row">
-                <div class="av">{{ a.display_name[0].toUpperCase() }}</div>
+                <div class="av">{{ a.display_name?.[0]?.toUpperCase() || '?' }}</div>
                 <span class="aname">{{ a.display_name }}</span>
                 <span class="adate">{{ formatJoinDate(a.joined_at) }}</span>
               </div>

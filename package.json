@@ -19,7 +19,8 @@
     "start:backend": "npm run start --workspace=backend",
     "test:backend": "npm run test --workspace=backend",
     "test:frontend": "npm run test --workspace=frontend",
-    "test": "concurrently \"npm run test:frontend\" \"npm run test:backend\""
+    "test": "concurrently \"npm run test:frontend\" \"npm run test:backend\"",
+    "db:seed": "npm run db:seed --workspace=backend"
   },
   "devDependencies": {
     "concurrently": "^8.2.0",

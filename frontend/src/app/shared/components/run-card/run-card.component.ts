@@ -1,5 +1,4 @@
-import { Component, Input, Output, EventEmitter, inject, OnInit, signal, DestroyRef } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { Component, Input, Output, EventEmitter, inject } from '@angular/core';
 import { RunEvent } from '../../../core/models/run-event.model';
 import { RunsService } from '../../../core/services/runs.service';
 
@@ -13,7 +12,7 @@ const NEW_CLUB_DAYS = 30;
     <div class="card" (click)="cardClick.emit(run)">
       <div class="banner" [style.background]="bannerGradient">
         <svg class="route-svg" viewBox="0 0 280 80" preserveAspectRatio="none">
-          <path d="M 28 58 Q 80 18 140 38 Q 200 58 252 22"
+          <path [attr.d]="routePath"
                 stroke="rgba(255,255,255,0.35)" stroke-width="2.5"
                 fill="none" stroke-dasharray="5 4" stroke-linecap="round"/>
           <circle cx="28" cy="58" r="5" fill="rgba(255,255,255,0.95)"/>
@@ -31,20 +30,25 @@ const NEW_CLUB_DAYS = 30;
 
       <div class="body">
         <div class="title">{{ run.title }}</div>
-        @if (run.club_name) {
-          <div class="club-chip">{{ run.club_name }}</div>
-        }
+        <div class="chip-row">
+          @if (run.club_name) {
+            <div class="club-chip">{{ run.club_name }}</div>
+          }
+          @if (runTypeLabel) {
+            <div class="run-type-chip">{{ runTypeLabel.emoji }} {{ runTypeLabel.label }}</div>
+          }
+        </div>
         <div class="meta-row">
           <span class="meta-text">{{ svc.formatDate(run.date) }} · {{ svc.formatTime(run.date) }}</span>
           @if (run.pace) { <span class="pace-chip">{{ run.pace }}</span> }
-          @if (weatherData()) {
-            <span class="weather-chip">{{ weatherEmoji(weatherData()!.weathercode) }} {{ weatherData()!.temperature_2m }}°C</span>
+          @for (tag of (run.tags ?? []); track tag) {
+            <span class="tag-chip">{{ tag }}</span>
           }
         </div>
         <div class="footer">
           <div class="facepile">
             @for (a of facepileAttendees; track a.id) {
-              <div class="fp-circle" [title]="a.display_name">{{ a.display_name[0]?.toUpperCase() || '?' }}</div>
+              <div class="fp-circle" [title]="a.display_name">{{ a.display_name?.[0]?.toUpperCase() || '?' }}</div>
             }
             @if (extraCount > 0) {
               <div class="fp-circle fp-extra">+{{ extraCount }}</div>
@@ -130,12 +134,25 @@ const NEW_CLUB_DAYS = 30;
       margin-bottom: 6px; line-height: 1.3;
     }
 
+    .chip-row {
+      display: flex; flex-wrap: wrap;
+      gap: 6px; margin-bottom: 8px;
+    }
+
     .club-chip {
       display: inline-block;
       font-size: 11px; font-weight: 600;
       background: #E1F5EE; color: #0F6E56;
       border-radius: 999px;
-      padding: 4px 10px; margin-bottom: 8px;
+      padding: 4px 10px;
+    }
+
+    .run-type-chip {
+      display: inline-block;
+      font-size: 11px; font-weight: 600;
+      background: #F0F0EE; color: #3A3A38;
+      border-radius: 999px;
+      padding: 4px 10px;
     }
 
     .meta-row {
@@ -152,13 +169,14 @@ const NEW_CLUB_DAYS = 30;
       text-transform: capitalize;
     }
 
-    .weather-chip {
+    .tag-chip {
       font-size: 11px; font-weight: 500;
-      background: #EFF6FF; color: #2563EB;
+      background: #E1F5EE; color: #0F6E56;
       border-radius: 999px; padding: 2px 8px;
+      text-transform: capitalize;
     }
 
-    .footer { display: flex; justify-content: space-between; align-items: center; }
+.footer { display: flex; justify-content: space-between; align-items: center; }
 
     .facepile { display: flex; align-items: center; gap: 2px; }
 
@@ -192,22 +210,13 @@ const NEW_CLUB_DAYS = 30;
     .join-btn.joined { background: #E1F5EE; color: #0F6E56; }
   `]
 })
-export class RunCardComponent implements OnInit {
+export class RunCardComponent {
   @Input() run!: RunEvent;
   @Input() isJoined = false;
   @Output() cardClick = new EventEmitter<RunEvent>();
   @Output() joinToggle = new EventEmitter<string>();
 
   svc = inject(RunsService);
-  private destroyRef = inject(DestroyRef);
-  weatherData = signal<{ temperature_2m: number; weathercode: number } | null>(null);
-
-  ngOnInit() {
-    this.svc.getWeather(this.run.id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: d => this.weatherData.set(d),
-      error: (e) => console.error('Failed to load weather', e)
-    });
-  }
 
   get facepileAttendees() { return this.run.attendees.slice(0, 3); }
   get extraCount() { return Math.max(0, this.run.attendees.length - 3); }
@@ -222,19 +231,34 @@ export class RunCardComponent implements OnInit {
       (this.run.tags ?? []).some(t => ['beginner', 'shakeout'].includes(t.toLowerCase()));
   }
 
+  get runTypeLabel(): { label: string; emoji: string } | null {
+    const map: Record<string, { label: string; emoji: string }> = {
+      club_run:       { label: 'Club Run',    emoji: '🏃' },
+      parkrun_style:  { label: 'Parkrun',     emoji: '🅿️' },
+      one_off_race:   { label: 'Race',        emoji: '🏅' },
+      training_group: { label: 'Training',    emoji: '💪' },
+      trail_run:      { label: 'Trail',       emoji: '🌲' },
+    };
+    return this.run.runType ? (map[this.run.runType] ?? null) : null;
+  }
+
   get isNewClub(): boolean {
     if (!this.run.club_created_at) return false;
     return (Date.now() - new Date(this.run.club_created_at).getTime()) / 86400000 <= NEW_CLUB_DAYS;
   }
 
-  weatherEmoji(code: number): string {
-    if (code === 0) return '☀️';
-    if (code <= 2) return '🌤️';
-    if (code <= 49) return '🌥️';
-    if (code <= 69) return '🌧️';
-    if (code <= 79) return '❄️';
-    if (code <= 99) return '⛈️';
-    return '🌡️';
+  get routePath(): string {
+    const km = this.run.distanceKm ?? 0;
+    if (km < 5) {
+      // Short: gentle undulation
+      return 'M 28 58 Q 80 48 140 52 Q 200 56 252 44';
+    } else if (km <= 15) {
+      // Medium: moderate hills (original)
+      return 'M 28 58 Q 80 18 140 38 Q 200 58 252 22';
+    } else {
+      // Long: dramatic peaks
+      return 'M 28 58 Q 60 8 140 28 Q 210 50 252 12';
+    }
   }
 
   get bannerGradient(): string {

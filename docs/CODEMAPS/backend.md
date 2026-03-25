@@ -1,8 +1,8 @@
-<!-- Generated: 2026-03-22 | Files scanned: 8 | Token estimate: ~450 -->
+<!-- Generated: 2026-03-23 | Files scanned: 9 | Token estimate: ~500 -->
 
 # Backend API Codemap
 
-**Last Updated:** 2026-03-22
+**Last Updated:** 2026-03-23
 **Entry Point:** `/Users/alexbeattie/Downloads/klub/backend/src/index.ts`
 
 ## Route Tree
@@ -10,8 +10,12 @@
 ```
 /api
 ├── /auth (auth.routes.ts)
-│   ├── POST /register          — Create user, return JWT
-│   └── POST /login             — Validate credentials, return JWT
+│   ├── POST /register          — Create user, return JWT + refreshToken
+│   ├── POST /login             — Validate credentials, return JWT + refreshToken
+│   ├── POST /refresh           — Exchange refreshToken for new JWT (requireAuth not needed)
+│   ├── POST /logout            — Revoke refreshToken (requireAuth)
+│   ├── POST /forgot-password   — Email reset link (token hashed, stored in password_reset_tokens)
+│   └── POST /reset-password    — Consume reset token, update password hash
 ├── /runs (runs.routes.ts)
 │   ├── GET /                   — List runs (filters: search, distance_min, date, city, club_id, pace)
 │   ├── GET /mine               — Organizer's created runs (requireAuth)
@@ -43,21 +47,39 @@
 
 **POST /api/auth/register**
 - Input: {displayName, email, password, role: 'runner'|'organizer'}
-- Validates: All fields required, email unique
-- Process: bcrypt.hash(password, 12) → INSERT users → jwt.sign(7d)
-- Output: {token, user{id,displayName,email,role}}
+- Validates: All fields required, email unique, password 8–128 chars
+- Process: bcrypt.hash(password, 12) → INSERT users → jwt.sign(1h) + refresh token (30d, hashed)
+- Output: {token, refreshToken, expiresIn, user{id,displayName,email,role}}
 - Status: 201 Created | 409 Conflict | 400 Bad Request | 500 Server Error
 
 **POST /api/auth/login**
 - Input: {email, password}
-- Process: SELECT users WHERE email → bcrypt.compare → jwt.sign(7d)
-- Output: {token, user{id,displayName,email,role}}
+- Process: SELECT users WHERE email → bcrypt.compare → jwt.sign(1h) + refresh token (30d, hashed)
+- Output: {token, refreshToken, expiresIn, user{id,displayName,email,role}}
 - Status: 200 OK | 401 Unauthorized | 500 Server Error
+
+**POST /api/auth/refresh**
+- Input: {refreshToken}
+- Process: Hash + compare against refresh_tokens table → issue new JWT (1h)
+- Output: {token, expiresIn}
+- Status: 200 OK | 401 Unauthorized
+
+**POST /api/auth/logout** (requireAuth)
+- Input: {refreshToken}
+- Process: DELETE from refresh_tokens WHERE token_hash matches
+- Output: {message: 'Logged out'}
+
+**POST /api/auth/forgot-password**
+- Rate limited; input: {email}; generates hashed token stored in password_reset_tokens (1h TTL)
+- Does not confirm whether email exists (prevents enumeration)
+
+**POST /api/auth/reset-password**
+- Input: {token, password}; validates token not expired/used; updates password_hash; marks token used
 
 ### Runs Routes (runs.routes.ts)
 
 **GET /api/runs** (public)
-- Filters: search (ILIKE title/club_name/start_address), distance_min, date (today|tomorrow|week), city, club_id, pace, trending, tags, club_ids
+- Filters: search (ILIKE title/club_name/start_address), distance_min, date (today|tomorrow|week), city, club_id, pace, run_type, trending, tags, club_ids
 - `?trending=1`: ORDER BY attendee_count DESC, scoped to event_date within next 72h (aggregation, not correlated subquery)
 - Query builder: Dynamic WHERE conditions with parameterized queries
 - JOIN: LEFT JOIN clubs c ON run_events.club_id = c.id — returns club_name, club_city, club_created_at in each row
@@ -68,7 +90,7 @@
 - Returns: Runs where created_by = req.user.id
 
 **POST /api/runs/** (requireAuth, organizer)
-- Input: {clubId?, title, startLocation, endLocation, startAddress, endAddress, date, distanceKm, estimatedMinutes, maxAttendees?, notes?, pace?, tags?}
+- Input: {clubId?, title, startLocation, endLocation, startAddress, endAddress, date, distanceKm, estimatedMinutes, maxAttendees?, notes?, pace?, tags?, run_type?}
 - Validates club ownership: If clubId provided, verify user is club owner or organizer member
 - INSERT run_events returns full row
 - Status: 201 Created | 403 Forbidden | 500 Error
@@ -162,7 +184,7 @@ app.listen(PORT)
 | File                          | Lines | Purpose                  |
 |-------------------------------|-------|--------------------------|
 | src/index.ts                  | 56    | App setup, route mounting|
-| src/routes/auth.routes.ts     | 33    | Register, login          |
+| src/routes/auth.routes.ts     | ~120  | Register, login, refresh, logout, forgot/reset password |
 | src/routes/runs.routes.ts     | ~280  | All run CRUD + join + weather proxy |
 | src/routes/clubs.routes.ts    | ~150  | All club CRUD + join     |
 | src/routes/geocode.routes.ts  | 26    | Google Geocoding proxy   |

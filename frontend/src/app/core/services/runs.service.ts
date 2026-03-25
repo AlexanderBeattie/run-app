@@ -24,6 +24,7 @@ export class RunsService {
       maxAttendees: r.max_attendees, notes: r.notes,
       status: r.status, createdBy: r.created_by,
       pace: r.pace, tags: r.tags,
+      runType: r.run_type,
       club_name: r.club_name, club_created_at: r.club_created_at
     };
   }
@@ -31,6 +32,7 @@ export class RunsService {
   loadRuns(params?: {
     search?: string; distance_min?: number; date?: string; city?: string;
     pace?: string; trending?: boolean; tags?: string; club_ids?: string;
+    run_type?: string;
   }) {
     const queryParams: any = {};
     if (params?.search) queryParams.search = params.search;
@@ -41,6 +43,7 @@ export class RunsService {
     if (params?.trending) queryParams.trending = 1;
     if (params?.tags) queryParams.tags = params.tags;
     if (params?.club_ids) queryParams.club_ids = params.club_ids;
+    if (params?.run_type) queryParams.run_type = params.run_type;
     return this.http.get<any[]>(`${environment.apiUrl}/runs`, { params: queryParams }).subscribe(data => {
       this.runs.set(data.map(r => this.mapRun(r)));
     });
@@ -49,7 +52,7 @@ export class RunsService {
   fetchRuns(params?: {
     search?: string; distance_min?: number; date?: string; city?: string;
     pace?: string; trending?: boolean; tags?: string; club_ids?: string;
-    date_from?: string; date_to?: string;
+    date_from?: string; date_to?: string; run_type?: string;
   }) {
     const queryParams: any = {};
     if (params?.search) queryParams.search = params.search;
@@ -62,6 +65,7 @@ export class RunsService {
     if (params?.club_ids) queryParams.club_ids = params.club_ids;
     if (params?.date_from) queryParams.date_from = params.date_from;
     if (params?.date_to) queryParams.date_to = params.date_to;
+    if (params?.run_type) queryParams.run_type = params.run_type;
     return this.http.get<any[]>(`${environment.apiUrl}/runs`, { params: queryParams }).pipe(
       map(data => data.map(r => this.mapRun(r)))
     );
@@ -73,10 +77,6 @@ export class RunsService {
 
   getAttendees(runId: string) {
     return this.http.get<{ id: string; display_name: string; joined_at: string }[]>(`${environment.apiUrl}/runs/${runId}/attendees`);
-  }
-
-  getWeather(runId: string) {
-    return this.http.get<{ temperature_2m: number; weathercode: number }>(`${environment.apiUrl}/runs/${runId}/weather`);
   }
 
   toggleJoin(runId: string, userId: string) {

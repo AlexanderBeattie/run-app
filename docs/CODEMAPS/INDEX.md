@@ -184,7 +184,7 @@ GOOGLE_MAPS_API_KEY=AIzaSyA...           # Browser Maps JS API
 PORT=3000                                 # Express server port
 DATABASE_URL=postgresql://user:pass@...   # PostgreSQL connection
 JWT_SECRET=your-secret-key               # Token signing key
-JWT_EXPIRES_IN=7d                        # Token lifetime
+JWT_EXPIRES_IN=1h                        # JWT lifetime (refresh tokens handle session continuity)
 CORS_ORIGIN=http://localhost:4200        # Production frontend origin
 GOOGLE_SERVER_API_KEY=AIzaSyA...         # Server-side Geocoding API
 ```
@@ -215,7 +215,7 @@ npm run test:frontend   # Frontend only
 |----------|----------|--------|-----------|
 | Frontend | Netlify  | frontend/dist/ | `npm run build:frontend` auto-builds from main |
 | Backend  | Render   | backend/dist/  | `npm run build:backend`, env vars injected |
-| Database | Render   | PostgreSQL     | migrations: `psql < backend/src/db/schema.sql` then `migration-001.sql` |
+| Database | Render   | PostgreSQL     | Fresh install: `psql < schema.sql`. Existing DB: run migration-001 through 004 individually. |
 
 See [architecture.md](architecture.md#deployment-targets) for more.
 
@@ -226,13 +226,11 @@ See [architecture.md](architecture.md#deployment-targets) for more.
 **Known Issues** (from project CLAUDE.md):
 1. PWA service worker: intermittent 404 on ngsw-worker.js
 2. PWA manifest: occasionally not served correctly on Netlify
-3. Google Maps: deprecated `Marker` API → should migrate to `AdvancedMarkerElement`
-4. Backend clubs.routes tests: still testing old 3-endpoint version
-5. No error boundary on frontend
-6. club_members.role supports 'member'|'organizer'|'owner' but only 'owner' enforced
+3. Backend clubs.routes tests: still testing old 3-endpoint version
+4. No error boundary on frontend
+5. club_members.role supports 'member'|'organizer'|'owner' but only 'owner' enforced
 
-**Phase 1 Complete:** All CRUD operations, authentication, permissions.
-**Phase 2 In Progress:** See `tasks/todo.md` for active sprint.
+**Phase 4 In Progress:** Deployment readiness. See `tasks/todo.md` for active sprint.
 
 ---
 
@@ -260,7 +258,7 @@ Each file includes a generated timestamp. If older than 2 weeks + recent code co
 
 ---
 
-Last refreshed by Claude Code on 2026-03-22.
+Last refreshed by Claude Code on 2026-03-23.
 
 For questions, check existing codemaps first. If not found, follow the pattern in any .md file to add documentation.
 

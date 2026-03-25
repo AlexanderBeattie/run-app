@@ -1,8 +1,8 @@
-<!-- Generated: 2026-03-22 | Files scanned: 19 | Token estimate: ~440 -->
+<!-- Generated: 2026-03-23 | Files scanned: 21 | Token estimate: ~460 -->
 
 # Frontend Architecture Codemap
 
-**Last Updated:** 2026-03-22
+**Last Updated:** 2026-03-23
 **Entry Points:** `/Users/alexbeattie/Downloads/klub/frontend/src/main.ts` | `/Users/alexbeattie/Downloads/klub/frontend/src/app/app.component.ts`
 
 ## Route Tree & Guards
@@ -13,6 +13,8 @@ routes (app.routes.ts)
 ├── / → redirect home
 ├── /login               LoadComponent: LoginComponent (no guard)
 ├── /register            LoadComponent: RegisterComponent (no guard)
+├── /forgot-password     LoadComponent: ForgotPasswordComponent (no guard)
+├── /reset-password      LoadComponent: ResetPasswordComponent (no guard)
 ├── /home        (authGuard) → HomeComponent
 ├── /map         (authGuard) → MapViewComponent
 ├── /clubs       (authGuard) → ClubListComponent
@@ -46,11 +48,23 @@ LoginComponent (features/auth/)
 ├── Form: email, password
 ├── AuthService.login() → navigate /home
 ├── Error toast on failure
+└── Link to /forgot-password
 
 RegisterComponent (features/auth/)
 ├── Form: displayName, email, password, role dropdown
 ├── AuthService.register() → navigate /home
 └── Error toast on failure
+
+ForgotPasswordComponent (features/auth/)
+├── Form: email
+├── POST /api/auth/forgot-password
+└── Success message regardless of email existence
+
+ResetPasswordComponent (features/auth/)
+├── Reads ?token= from query params
+├── Form: new password + confirm
+├── POST /api/auth/reset-password
+└── Navigates /login on success
 ```
 
 ### Feature: Home/Feed (features/home/)
@@ -161,16 +175,19 @@ currentUser: Signal<KlubUser | null>  ← loads from localStorage on init
 getUser(): Signal
 isLoggedIn(): boolean
 isOrganizer(): boolean
+isTokenExpired(): boolean  ← checks expiresAt with 60s buffer
 login(email, password): Observable
 register(displayName, email, password, role): Observable
+refresh(): Observable  ← exchanges refreshToken for new JWT
 logout(): void
+  └── POST /api/auth/logout (revokes server-side refresh token)
   └── clears localStorage, resets signal
 ```
 
 **Session Persistence:**
-- localStorage keys: `klub_token`, `klub_user`
+- localStorage keys: `klub_token`, `klub_user`, `klub_refresh_token`, `klub_expires_at`
 - Restored on AppComponent init via authGuard checks
-- Manual token refresh: not implemented (7d expiry)
+- Proactive token refresh: jwtInterceptor checks isTokenExpired() before each request
 
 ### RunsService (core/services/runs.service.ts)
 ```
@@ -298,9 +315,10 @@ CanActivateFn
 **jwtInterceptor** (core/interceptors/jwt.interceptor.ts)
 ```
 HttpInterceptorFn
-├── On request: Get token from localStorage
+├── Skips /auth/ routes (login, register, forgot/reset password)
+├── On request: Check isTokenExpired() → proactively call refresh() if true
 ├── Append: Authorization: Bearer {token}
-└── On error 401: AuthService.logout() + navigate /login
+└── On error 401: AuthService.logout() + navigate /login (force-logout)
 ```
 
 ## Configuration
@@ -341,7 +359,7 @@ src/app/
 │   ├── models/               (1 file)
 │   └── services/             (4 files)
 ├── features/
-│   ├── auth/                 (2 components)
+│   ├── auth/                 (4 components)
 │   ├── clubs/                (7 components)
 │   ├── home/                 (1 component)
 │   ├── map/                  (1 component)

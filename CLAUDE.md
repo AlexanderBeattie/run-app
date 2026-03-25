@@ -22,9 +22,10 @@ Subagents inherit CLAUDE.md and global rules but NOT conversation context. Injec
 |---|---|
 | Any test file | `tasks/lessons.md` — mandatory, prevents Jest/Angular config loops |
 | Any feature work | `tasks/todo.md` — sprint context |
-| Backend routes or schema | `backend/src/db/schema.sql` |
-| New component or route | Frontend file map section from this CLAUDE.md |
-| Architectural scope | `docs/CODEMAPS/*.md` if present |
+| Backend routes or middleware | `docs/CODEMAPS/backend.md` — route tree, request/response specs, middleware chain |
+| Database queries or schema | `docs/CODEMAPS/data.md` — ER diagram, constraints, query patterns |
+| New component or route | `docs/CODEMAPS/frontend.md` — component hierarchy, lazy routes, service APIs |
+| Architectural scope | `docs/CODEMAPS/INDEX.md` — system overview + cross-references |
 
 Targeted context beats blanket context. Only inject what's relevant to the task — reading `lessons.md` costs ~3-4k tokens upfront but prevents 20-30k token debugging loops.
 
@@ -110,18 +111,20 @@ klub/
 ### Commands
 ```bash
 npm run dev              # start both frontend and backend
-npm run test:backend     # jest — 4 suites, 29 tests
-npm run test:frontend    # jest — 6 suites, 40 tests
+npm run test:backend     # jest — 87 tests, 5 suites
+npm run test:frontend    # jest — 110 tests total
 npm run build:frontend   # generates env then ng build
 npm run build:backend    # tsc
+npm run db:seed          # seed local DB with test data (TRUNCATES first)
 ```
 
 ### Database
 - **Local**: klubdb / klubuser / klubpass on localhost:5432
-- **Schema**: `backend/src/db/schema.sql`
-- **Migration**: `backend/src/db/migration-001.sql`
-- **Tables**: users, clubs, club_members, run_events, run_attendees
-- Migrations are manual SQL files — run with `psql`
+- **Schema**: `backend/src/db/schema.sql` — canonical, includes all migrations, use for fresh installs
+- **Migrations**: `migration-001.sql` (club_members, pace/tags), `migration-002.sql` (refresh_tokens), `migration-003.sql` (password_reset_tokens), `migration-004.sql` (run_type)
+- **Tables**: users, clubs, club_members, run_events, run_attendees, refresh_tokens, password_reset_tokens
+- **Seed**: `npm run db:seed` — 5 users, 2 clubs, 7 runs, 14 attendees (TRUNCATES — dev only)
+- Migrations are manual SQL files — run individual files against existing DB with `psql`
 
 ### Permissions model
 | Action                   | Runner | Organiser | Club Owner |
@@ -134,39 +137,7 @@ npm run build:backend    # tsc
 Backend enforces all permissions. Frontend controls visibility only.
 
 ### API endpoints
-```
-# Auth
-POST   /api/auth/register
-POST   /api/auth/login
-
-# Runs
-GET    /api/runs              — ?search=, ?distance_min=, ?date=today|tomorrow|week, ?city=, ?pace=, ?club_id=
-GET    /api/runs/mine         — organiser's own runs (auth)
-GET    /api/runs/joined       — runner's joined runs (auth)
-GET    /api/runs/:id
-GET    /api/runs/:id/attendees
-POST   /api/runs              — create run (auth, organizer, validates club ownership if clubId provided)
-PATCH  /api/runs/:id          — edit/cancel (auth, creator only)
-DELETE /api/runs/:id          — delete (auth, creator only)
-POST   /api/runs/:id/join     — toggle join/unjoin (auth)
-
-# Clubs
-GET    /api/clubs             — list all with member count + next run date
-GET    /api/clubs/mine        — clubs user is member of (auth)
-GET    /api/clubs/owned       — clubs user owns (auth, for create-run dropdown)
-GET    /api/clubs/:id         — club profile
-GET    /api/clubs/:id/runs    — club's active runs
-GET    /api/clubs/:id/members — member list
-POST   /api/clubs             — create club (auth, auto-joins owner)
-PATCH  /api/clubs/:id         — update (owner only)
-POST   /api/clubs/:id/join    — toggle join/leave (auth, owner can't leave)
-
-# Geocode
-GET    /api/geocode?address=  — proxies to Google Geocoding API server-side
-
-# Health
-GET    /api/health
-```
+See `docs/CODEMAPS/backend.md` for the full route tree with request/response specs.
 
 ### Angular patterns — DO NOT DEVIATE
 - **Standalone components only** — no NgModules anywhere
@@ -193,53 +164,9 @@ These patterns were debugged extensively. Do not change test infrastructure with
 - `package.json` jest config uses `transform` with `ts-jest` pointing to `tsconfig.test.json`
 - Tests mock `../../db` with `jest.mock()` and use supertest
 
-### Frontend file map
-```
-src/app/
-├── app.component.ts          — shell with bottom nav + toast outlet
-├── app.config.ts              — providers: router, httpClient, service worker
-├── app.routes.ts              — lazy loaded routes with guards
-├── core/
-│   ├── guards/                — authGuard, organizerGuard (functional CanActivateFn)
-│   ├── interceptors/          — jwtInterceptor (attaches Bearer token)
-│   ├── models/                — RunEvent, KlubUser, Club, ClubMember, CreateRunPayload
-│   └── services/              — AuthService, RunsService, ClubService, GeocodingService
-├── features/
-│   ├── auth/                  — LoginComponent, RegisterComponent
-│   ├── clubs/                 — ClubListComponent, ClubProfileComponent, CreateClubComponent,
-│   │                            CreateRunComponent, EditRunComponent, OrganiserHomeComponent,
-│   │                            RunOrganiserDialogComponent
-│   ├── home/                  — HomeComponent (feed with search + filters)
-│   ├── map/                   — MapViewComponent (Google Maps + geolocation)
-│   └── profile/               — RunnerProfileComponent
-└── shared/
-    ├── components/
-    │   ├── bottom-nav/        — 4-tab nav (Home, Map, Clubs, Profile/Dashboard)
-    │   ├── run-card/          — reusable run card
-    │   ├── run-detail-dialog/ — bottom sheet run detail
-    │   └── toast/             — notification toasts
-    └── services/
-        └── toast.service.ts   — signal-based toast state
-```
-
-### Backend file map
-```
-src/
-├── index.ts                   — Express app, CORS, route mounting, health check
-├── db/
-│   ├── index.ts               — pg Pool with SSL toggle
-│   ├── schema.sql             — initial schema (4 tables)
-│   └── migration-001.sql      — club_members, pace/tags columns
-├── middleware/
-│   └── auth.middleware.ts     — JWT verification, sets req.user
-├── routes/
-│   ├── auth.routes.ts         — register + login
-│   ├── clubs.routes.ts        — full club CRUD + membership
-│   ├── geocode.routes.ts      — Google Geocoding proxy
-│   └── runs.routes.ts         — CRUD + filters + join toggle
-└── types/
-    └── index.ts               — AuthRequest interface
-```
+### File maps
+See `docs/CODEMAPS/frontend.md` for component hierarchy, routes, and service APIs.
+See `docs/CODEMAPS/backend.md` for backend file organisation and middleware chain.
 
 ### Brand
 - Primary green: `#1D9E75`
@@ -256,24 +183,15 @@ src/
 - Complete working files in cases of multiple changes throughout same file — never partial snippets
 - Separate code blocks per file when showing multiple files
 
-### Environment variables (root .env)
-```
-GOOGLE_MAPS_API_KEY=
-PORT=3000
-DATABASE_URL=postgresql://klubuser:klubpass@localhost:5432/klubdb
-JWT_SECRET=
-JWT_EXPIRES_IN=7d
-CORS_ORIGIN=http://localhost:4200
-```
+### Environment variables
+See `docs/CODEMAPS/dependencies.md` for full env var list. Local DB: `klubdb / klubuser / klubpass @ localhost:5432`.
 
 ### Known issues
 1. PWA service worker: intermittent 404 on ngsw-worker.js
 2. PWA manifest: occasionally not served correctly on Netlify
-3. Google Maps: using deprecated `Marker` API — should migrate to `AdvancedMarkerElement`
-4. Backend clubs.routes tests: still testing old 3-endpoint version, need updating
-5. Production DB: migration-001.sql may not have been run yet
-6. No error boundary on frontend — unhandled API errors show in console only
-7. club_members.role supports 'member' | 'organizer' | 'owner' but only 'owner' enforced
+3. Backend clubs.routes tests: still testing old 3-endpoint version, need updating
+4. No error boundary on frontend — unhandled API errors show in console only
+5. club_members.role supports 'member' | 'organizer' | 'owner' but only 'owner' enforced
 
 ### Current phase
 See `tasks/todo.md` for active sprint and task queue.

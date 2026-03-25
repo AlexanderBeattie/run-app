@@ -1,9 +1,9 @@
-<!-- Generated: 2026-03-22 | Files scanned: 2 | Token estimate: ~320 -->
+<!-- Generated: 2026-03-23 | Files scanned: 6 | Token estimate: ~380 -->
 
 # Database Schema Codemap
 
-**Last Updated:** 2026-03-22
-**Sources:** `/Users/alexbeattie/Downloads/klub/backend/src/db/schema.sql` | `/Users/alexbeattie/Downloads/klub/backend/src/db/migration-001.sql`
+**Last Updated:** 2026-03-23
+**Sources:** `backend/src/db/schema.sql` (canonical — all migrations consolidated) | `backend/src/db/migration-001.sql` through `migration-004.sql`
 
 ## Tables & Relationships
 
@@ -143,6 +143,7 @@
 | status           | VARCHAR(20)   | DEFAULT 'active'     | 'active'\|'cancelled'    |
 | pace             | VARCHAR(20)   | (migration-001)      | e.g., "4:30/km"          |
 | tags             | TEXT[]        | DEFAULT '{}' (migration-001) | Array of strings |
+| run_type         | VARCHAR(30)   | CHECK constraint (migration-004) | club_run\|parkrun_style\|one_off_race\|training_group\|trail_run |
 | created_by       | UUID          | FK→users             | Organizer who created    |
 | created_at       | TIMESTAMP     | DEFAULT NOW()        |                          |
 
@@ -209,23 +210,46 @@ ORDER BY c.created_at DESC
 | club_members | (club_id, user_id) UNIQUE | PK | Prevent duplicate membership |
 | run_attendees | (run_id, user_id) UNIQUE | PK | Prevent duplicate joins |
 
+## Auth Tables (Phase 4)
+
+### refresh_tokens
+| Column      | Type       | Constraints        | Notes                        |
+|-------------|------------|--------------------|------------------------------|
+| id          | UUID       | PK                 |                              |
+| user_id     | UUID       | FK→users CASCADE   |                              |
+| token_hash  | TEXT       | NOT NULL           | bcrypt-hashed refresh token  |
+| expires_at  | TIMESTAMP  | NOT NULL           | 30-day expiry                |
+| created_at  | TIMESTAMP  | DEFAULT NOW()      |                              |
+
+### password_reset_tokens
+| Column      | Type       | Constraints        | Notes                              |
+|-------------|------------|--------------------|-------------------------------------|
+| id          | UUID       | PK                 |                                     |
+| user_id     | UUID       | FK→users CASCADE   |                                     |
+| token_hash  | TEXT       | NOT NULL           | bcrypt-hashed reset token           |
+| expires_at  | TIMESTAMP  | NOT NULL           | Short-lived (1h)                    |
+| used        | BOOLEAN    | DEFAULT false      | One-time use flag                   |
+| created_at  | TIMESTAMP  | DEFAULT NOW()      |                                     |
+
 ## Migrations
 
-**Phase 1: schema.sql** — Initial 4 tables (users, clubs, run_events, run_attendees)
-**Phase 2: migration-001.sql**
-- Create club_members table (enforcement of club roles)
-- Add city, pace, tags to clubs
-- Add pace, tags to run_events
+| File | Contents |
+|------|----------|
+| schema.sql | Canonical — all 4 migrations consolidated. Use for fresh installs. |
+| migration-001.sql | club_members table; city/pace/tags/logo_url on clubs; pace/tags on run_events |
+| migration-002.sql | refresh_tokens table |
+| migration-003.sql | password_reset_tokens table |
+| migration-004.sql | run_type VARCHAR(30) on run_events with CHECK constraint |
 
-**Future migrations:** None currently planned. Strava integration field placeholder exists (strava_connected).
+> Run individual migration files (not schema.sql) against an existing production DB.
 
 ## Performance Notes
 
 - **Denormalized club_name** in run_events avoids join in list queries
 - **Computed member_count** at query-time (not cached after insert)
 - **json_agg(attendees)** expensive for large runs; pagination not implemented
-- **No indexes declared** in schema — Render managed DB likely has defaults
-- **ILIKE filters** may cause full table scans without indexes on text columns
+- **11 indexes declared** in schema.sql — event_date, club_id, created_by, status, run_type, user email, club_members, run_attendees
+- **ILIKE filters** on title/club_name/start_address covered by indexes
 
 ## Related Codemaps
 - [backend.md](backend.md) — SQL queries, API implementation

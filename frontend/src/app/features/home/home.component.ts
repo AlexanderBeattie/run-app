@@ -1,6 +1,7 @@
-import { Component, inject, OnInit, ChangeDetectorRef, signal, DestroyRef } from '@angular/core';
+import { Component, inject, OnInit, ChangeDetectorRef, signal, DestroyRef, HostListener } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { HttpClient } from '@angular/common/http';
 import { RunsService } from '../../core/services/runs.service';
 import { AuthService } from '../../core/services/auth.service';
 import { ClubService } from '../../core/services/club.service';
@@ -10,6 +11,7 @@ import { RunDetailDialogComponent } from '../../shared/components/run-detail-dia
 import { RunEvent, Club } from '../../core/models/run-event.model';
 import { Subject, debounceTime, distinctUntilChanged } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { environment } from '../../../environments/environment';
 
 @Component({
   selector: 'app-home',
@@ -25,7 +27,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
             <svg width="12" height="14" viewBox="0 0 12 14" fill="none">
               <path d="M6 0C3.24 0 1 2.18 1 4.86 1 8.5 6 14 6 14s5-5.5 5-9.14C11 2.18 8.76 0 6 0zm0 6.6a1.75 1.75 0 1 1 0-3.5 1.75 1.75 0 0 1 0 3.5z" fill="#1D9E75"/>
             </svg>
-            <span class="location-label">London</span>
+            <span class="location-label">{{ locationLabel() }}</span>
             <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
               <path d="M2.5 3.5L5 6.5L7.5 3.5" stroke="#9B9B98" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
@@ -50,6 +52,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
             type="text"
             [(ngModel)]="searchQuery"
             (ngModelChange)="onSearchChange($event)"
+            (focus)="onSearchFocus()"
             placeholder="Search runs, clubs, areas..." />
         </div>
         <button class="filter-btn" [class.active]="hasActiveFilters">
@@ -59,6 +62,29 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
             <line x1="11" y1="18" x2="13" y2="18"/>
           </svg>
         </button>
+
+        <!-- Search dropdown -->
+        @if (showDropdown() && searchResults().length > 0) {
+          <div class="search-dropdown">
+            @for (result of searchResults(); track result.id) {
+              <div class="search-result-row" (click)="onSelectSearchResult(result)">
+                <div class="sr-left">
+                  <div class="sr-icon" [style.background]="gradientForPace(result.pace)"></div>
+                  <div class="sr-info">
+                    <div class="sr-title">{{ result.title }}</div>
+                    <div class="sr-meta">{{ runsService.formatDate(result.date) }} · {{ result.distanceKm }}km</div>
+                  </div>
+                </div>
+                <div class="sr-pace" [class]="'sr-pace-' + (result.pace ?? 'default')">{{ result.pace ?? '' }}</div>
+              </div>
+            }
+          </div>
+        }
+        @if (showDropdown() && searchQuery.length >= 2 && searchResults().length === 0 && !searchLoading()) {
+          <div class="search-dropdown search-dropdown-empty">
+            <div class="sr-empty">No runs found for "{{ searchQuery }}"</div>
+          </div>
+        }
       </div>
 
       <!-- Category tiles -->
@@ -157,6 +183,16 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
             <button class="toggle-btn" [class.toggle-active]="feedMode() === 'mine'" (click)="setFeedMode('mine')">My Clubs</button>
           </div>
         </div>
+
+        <!-- Run type filter pills -->
+        <div class="type-pills-row">
+          <button class="type-pill" [class.active]="activeRunType() === null" (click)="setRunType(null)">All</button>
+          @for (t of runTypePills; track t.value) {
+            <button class="type-pill" [class.active]="activeRunType() === t.value" (click)="setRunType(t.value)">
+              {{ t.emoji }} {{ t.label }}
+            </button>
+          }
+        </div>
       </div>
 
       <div class="feed-surface">
@@ -233,6 +269,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
       display: flex;
       gap: 10px;
       padding: 0 16px 18px;
+      position: relative;
     }
     .search-box {
       flex: 1;
@@ -265,6 +302,77 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
       transition: background 0.15s;
     }
     .filter-btn.active { background: #0D0D0D; color: #fff; }
+
+    /* ── Search dropdown ─────────────────────────────────────── */
+    .search-dropdown {
+      position: absolute;
+      top: calc(100% - 10px);
+      left: 16px;
+      right: 76px;
+      background: #fff;
+      border-radius: 14px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.12), 0 0 0 0.5px rgba(0,0,0,0.08);
+      z-index: 200;
+      overflow: hidden;
+    }
+    .search-dropdown-empty {
+      padding: 16px;
+    }
+    .sr-empty {
+      font-size: 13px;
+      color: #9B9B98;
+      text-align: center;
+    }
+    .search-result-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 14px;
+      cursor: pointer;
+      border-bottom: 0.5px solid rgba(0,0,0,0.06);
+      transition: background 0.1s;
+    }
+    .search-result-row:last-child { border-bottom: none; }
+    .search-result-row:active { background: #F7F7F5; }
+    .sr-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex: 1;
+      min-width: 0;
+    }
+    .sr-icon {
+      width: 32px; height: 32px;
+      border-radius: 10px;
+      flex-shrink: 0;
+    }
+    .sr-info { min-width: 0; }
+    .sr-title {
+      font-size: 14px;
+      font-weight: 500;
+      color: #0D0D0D;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .sr-meta {
+      font-size: 12px;
+      color: #9B9B98;
+      margin-top: 1px;
+    }
+    .sr-pace {
+      font-size: 10px;
+      font-weight: 600;
+      border-radius: 999px;
+      padding: 2px 8px;
+      text-transform: capitalize;
+      flex-shrink: 0;
+      margin-left: 8px;
+    }
+    .sr-pace-easy, .sr-pace-social { background: #E1F5EE; color: #0F6E56; }
+    .sr-pace-moderate { background: #EFF6FF; color: #1e3a8a; }
+    .sr-pace-fast, .sr-pace-tempo { background: #FEF2F2; color: #7f1d1d; }
+    .sr-pace-default { display: none; }
 
     /* ── Category tiles ─────────────────────────────────────── */
     .categories {
@@ -416,6 +524,37 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
     /* ── Feed ───────────────────────────────────────────────── */
     .feed-header { padding: 0 20px 14px; }
+
+    .type-pills-row {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      padding-top: 12px;
+      margin: 0 -20px;
+      padding-left: 20px;
+      padding-right: 20px;
+    }
+    .type-pills-row::-webkit-scrollbar { display: none; }
+
+    .type-pill {
+      flex-shrink: 0;
+      background: #F7F7F5;
+      border: 1.5px solid transparent;
+      border-radius: 999px;
+      padding: 6px 14px;
+      font-size: 13px; font-weight: 500;
+      color: #6B6B68;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 0.12s, color 0.12s, border-color 0.12s;
+      white-space: nowrap;
+    }
+    .type-pill.active {
+      background: #0D0D0D;
+      color: #fff;
+      border-color: #0D0D0D;
+    }
     .feed-header-top {
       display: flex;
       justify-content: space-between;
@@ -514,6 +653,7 @@ export class HomeComponent implements OnInit {
   toast = inject(ToastService);
   cdr = inject(ChangeDetectorRef);
   destroyRef = inject(DestroyRef);
+  private http = inject(HttpClient);
 
   selectedRun = signal<RunEvent | null>(null);
   errorMessage = signal<string | null>(null);
@@ -521,6 +661,11 @@ export class HomeComponent implements OnInit {
   weekendRuns = signal<RunEvent[]>([]);
   clubs = signal<Club[]>([]);
   feedMode = signal<'all' | 'mine'>('all');
+  activeRunType = signal<string | null>(null);
+  locationLabel = signal('Locating...');
+  searchResults = signal<RunEvent[]>([]);
+  showDropdown = signal(false);
+  searchLoading = signal(false);
   loaded = false;
   searchQuery = '';
   activeCategory = 'All';
@@ -531,6 +676,14 @@ export class HomeComponent implements OnInit {
   private readonly clubColours = [
     '#1D9E75', '#3B82F6', '#F59E0B', '#EC4899',
     '#8B5CF6', '#EF4444', '#10B981', '#6366F1',
+  ];
+
+  readonly runTypePills = [
+    { value: 'club_run',       label: 'Club Run',  emoji: '🏃' },
+    { value: 'parkrun_style',  label: 'Parkrun',   emoji: '🅿️' },
+    { value: 'one_off_race',   label: 'Race',      emoji: '🏅' },
+    { value: 'training_group', label: 'Training',  emoji: '💪' },
+    { value: 'trail_run',      label: 'Trail',     emoji: '🌲' },
   ];
 
   categories = [
@@ -559,13 +712,87 @@ export class HomeComponent implements OnInit {
     return this.activeCategory !== 'All' || !!this.searchQuery;
   }
 
+  @HostListener('document:click', ['$event'])
+  onDocumentClick(e: MouseEvent) {
+    const target = e.target as HTMLElement;
+    if (!target.closest('.search-row')) {
+      this.showDropdown.set(false);
+    }
+  }
+
   ngOnInit() {
+    this.detectLocation();
     this.loadWithParams();
     this.loadCarousels();
+
+    // Main feed search subscription
     this.searchSubject.pipe(debounceTime(300), distinctUntilChanged(), takeUntilDestroyed(this.destroyRef)).subscribe(q => {
       this.currentParams = { ...this.currentParams, search: q || undefined };
       this.loadWithParams();
+
+      // Dropdown search subscription
+      if (q.length >= 2) {
+        this.searchLoading.set(true);
+        this.runsService.fetchRuns({ search: q }).subscribe({
+          next: runs => {
+            this.searchResults.set(runs.slice(0, 6));
+            this.showDropdown.set(true);
+            this.searchLoading.set(false);
+            this.cdr.markForCheck();
+          },
+          error: () => {
+            this.searchResults.set([]);
+            this.searchLoading.set(false);
+          }
+        });
+      } else {
+        this.searchResults.set([]);
+        this.showDropdown.set(false);
+      }
     });
+  }
+
+  private detectLocation() {
+    if (!navigator.geolocation) {
+      this.locationLabel.set('Near you');
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        const { latitude, longitude } = pos.coords;
+        this.http.get<{ formatted_address: string }>(`${environment.apiUrl}/geocode?address=${latitude},${longitude}`)
+          .subscribe({
+            next: r => {
+              const city = this.parseCityFromAddress(r.formatted_address);
+              this.locationLabel.set(city);
+              this.cdr.markForCheck();
+            },
+            error: () => this.locationLabel.set('Near you')
+          });
+      },
+      () => this.locationLabel.set('Near you'),
+      { timeout: 8000 }
+    );
+  }
+
+  private parseCityFromAddress(address: string): string {
+    // Google formatted_address is typically "Street, City, Region, Country"
+    // We want the first component that looks like a city (not a street number)
+    const parts = address.split(',').map(p => p.trim());
+    // Skip parts that start with a number (street addresses)
+    const cityPart = parts.find(p => !/^\d/.test(p) && p.length > 1);
+    return cityPart ?? parts[0] ?? 'Near you';
+  }
+
+  onSearchFocus() {
+    if (this.searchQuery.length >= 2 && this.searchResults().length > 0) {
+      this.showDropdown.set(true);
+    }
+  }
+
+  onSelectSearchResult(run: RunEvent) {
+    this.showDropdown.set(false);
+    this.openDialog(run);
   }
 
   private loadCarousels() {
@@ -621,9 +848,15 @@ export class HomeComponent implements OnInit {
     }
   }
 
+  setRunType(type: string | null) {
+    this.activeRunType.set(type);
+    this.loadWithParams();
+  }
+
   private loadWithParams() {
     this.loaded = false;
-    this.runsService.loadRuns(this.currentParams);
+    const runType = this.activeRunType();
+    this.runsService.loadRuns({ ...this.currentParams, ...(runType ? { run_type: runType } : {}) });
     setTimeout(() => { this.loaded = true; this.cdr.markForCheck(); }, 600);
   }
 

@@ -1,8 +1,8 @@
-<!-- Generated: 2026-03-22 | Files scanned: 3 | Token estimate: ~280 -->
+<!-- Generated: 2026-03-23 | Files scanned: 3 | Token estimate: ~290 -->
 
 # Dependencies & Configuration Codemap
 
-**Last Updated:** 2026-03-22
+**Last Updated:** 2026-03-23
 **Sources:** `package.json` (all 3) | `.env` (root, gitignored)
 
 ## Environment Variables
@@ -15,7 +15,7 @@
 | PORT | backend index.ts | 3000 | Express server port |
 | DATABASE_URL | backend db/index.ts | postgresql://user:pass@host:5432/db | PostgreSQL connection |
 | JWT_SECRET | backend auth/routes | (any string) | Signing & verification of JWTs |
-| JWT_EXPIRES_IN | backend auth/routes | 7d | Token lifetime (applied to all JWTs) |
+| JWT_EXPIRES_IN | backend auth/routes | 1h | JWT lifetime (short-lived; refresh tokens handle session continuity) |
 | CORS_ORIGIN | backend index.ts | https://frontend.netlify.com | Production frontend origin for CORS |
 | GOOGLE_SERVER_API_KEY | backend geocode/routes.ts | (API key) | Server-side Google Geocoding proxy |
 
@@ -36,8 +36,9 @@
 | jsonwebtoken | ^9.0.0 | JWT generation & verification |
 | cors | ^2.8.5 | CORS middleware (allows localhost:4200 + CORS_ORIGIN) |
 | dotenv | ^16.0.3 | Load .env into process.env |
+| express-rate-limit | ^8.3.1 | Rate limiting (login 5/15m, register 3/h, API 100/15m) |
 
-**Total: 6 core dependencies**
+**Total: 7 core dependencies**
 
 ### Development (dev tools)
 

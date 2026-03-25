@@ -3,9 +3,11 @@ import { provideRouter } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { signal } from '@angular/core';
+import { of } from 'rxjs';
 import { HomeComponent } from '../home.component';
 import { RunsService } from '../../../core/services/runs.service';
 import { AuthService } from '../../../core/services/auth.service';
+import { ClubService } from '../../../core/services/club.service';
 import { ToastService } from '../../../shared/services/toast.service';
 import { RunEvent } from '../../../core/models/run-event.model';
 
@@ -24,9 +26,12 @@ describe('HomeComponent', () => {
   let runsService: any;
   let authService: any;
 
+  let clubService: any;
+
   beforeEach(async () => {
     runsService = {
       loadRuns: jest.fn(),
+      fetchRuns: jest.fn().mockReturnValue(of([])),
       getRuns: jest.fn().mockReturnValue(signal([])),
       getJoinedRunIds: jest.fn().mockReturnValue(signal([])),
       toggleJoin: jest.fn()
@@ -34,6 +39,10 @@ describe('HomeComponent', () => {
     authService = {
       getUser: jest.fn().mockReturnValue(signal({ displayName: 'Alex Beattie', role: 'runner' })),
       isLoggedIn: jest.fn().mockReturnValue(true)
+    };
+    clubService = {
+      listClubs: jest.fn().mockReturnValue(of([])),
+      getMineClubs: jest.fn().mockReturnValue(of([]))
     };
 
     TestBed.resetTestingModule();
@@ -45,6 +54,7 @@ describe('HomeComponent', () => {
         provideHttpClientTesting(),
         { provide: RunsService, useValue: runsService },
         { provide: AuthService, useValue: authService },
+        { provide: ClubService, useValue: clubService },
         ToastService
       ]
     }).compileComponents();

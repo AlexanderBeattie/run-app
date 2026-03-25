@@ -36,6 +36,7 @@ import { signal } from '@angular/core';
           <div class="club-stats">
             <div class="stat"><div class="sv">{{ club.member_count }}</div><div class="sl">members</div></div>
             <div class="stat"><div class="sv">{{ club.active_run_count ?? 0 }}</div><div class="sl">active runs</div></div>
+            <div class="stat"><div class="sv">{{ totalAttendance }}</div><div class="sl">people going</div></div>
           </div>
           <div class="tag-row">
             @if (club.pace) { <span class="tag pace">{{ club.pace }}</span> }
@@ -46,7 +47,10 @@ import { signal } from '@angular/core';
               {{ isMember ? 'Leave club' : 'Join club' }}
             </button>
           } @else {
-            <div class="owner-badge">You own this club</div>
+            <div class="owner-actions">
+              <div class="owner-badge">You own this club</div>
+              <button class="edit-btn" (click)="router.navigate(['/clubs/edit', clubId])">Edit club</button>
+            </div>
           }
         </div>
 
@@ -141,7 +145,9 @@ import { signal } from '@angular/core';
     .tag.pace { background: rgba(29,158,117,0.25); color: #1D9E75; }
     .join-btn { width: 100%; max-width: 280px; background: #1D9E75; color: #E1F5EE; border: none; border-radius: 12px; padding: 12px; font-size: 14px; font-weight: 500; cursor: pointer; font-family: inherit; }
     .join-btn.joined { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.6); }
+    .owner-actions { display: flex; align-items: center; gap: 10px; }
     .owner-badge { font-size: 12px; color: rgba(255,255,255,0.4); background: rgba(255,255,255,0.08); border-radius: 8px; padding: 6px 12px; }
+    .edit-btn { background: rgba(29,158,117,0.2); color: #1D9E75; border: 1px solid rgba(29,158,117,0.4); border-radius: 8px; padding: 6px 14px; font-size: 12px; font-weight: 500; cursor: pointer; font-family: inherit; }
     .content { padding: 16px 12px 20px; }
     .section-title { font-size: 11px; font-weight: 500; color: #9B9B98; text-transform: uppercase; letter-spacing: 0.06em; padding: 0 4px; margin-bottom: 12px; }
     .empty { text-align: center; padding: 20px 16px; font-size: 13px; color: #9B9B98; margin-bottom: 16px; }
@@ -173,6 +179,7 @@ export class ClubProfileComponent implements OnInit {
     clubId = '';
 
     get isOwner() { return this.club?.owner_id === this.auth.getUser()()?.id; }
+    get totalAttendance() { return this.runs.reduce((sum, r) => sum + (r.attendees?.length ?? 0), 0); }
 
     ngOnInit() {
         this.clubId = this.route.snapshot.paramMap.get('id') ?? '';
