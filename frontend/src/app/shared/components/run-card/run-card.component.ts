@@ -9,17 +9,19 @@ const NEW_CLUB_DAYS = 30;
   selector: 'app-run-card',
   standalone: true,
   template: `
-    <div class="card" (click)="cardClick.emit(run)">
+    <div class="card" role="button" [attr.aria-label]="'View run: ' + run.title" (click)="cardClick.emit(run)">
       <div class="banner" [style.background]="bannerGradient">
         <svg class="route-svg" viewBox="0 0 280 80" preserveAspectRatio="none">
-          <path [attr.d]="routePath"
+          <path [attr.d]="routeGeometry.path"
                 stroke="rgba(255,255,255,0.35)" stroke-width="2.5"
                 fill="none" stroke-dasharray="5 4" stroke-linecap="round"/>
-          <circle cx="28" cy="58" r="5" fill="rgba(255,255,255,0.95)"/>
-          <circle cx="252" cy="22" r="5" fill="transparent"
+          <circle cx="28" [attr.cy]="routeGeometry.startY" r="5" fill="rgba(255,255,255,0.95)"/>
+          <circle cx="252" [attr.cy]="routeGeometry.endY" r="5" fill="transparent"
                   stroke="rgba(255,255,255,0.9)" stroke-width="2.5"/>
         </svg>
-        <div class="dist-pill">{{ run.distanceKm }}km</div>
+        @if (hasDistance) {
+          <div class="dist-pill">{{ run.distanceKm }}km<span class="dist-miles"> / {{ distanceMiles }}mi</span></div>
+        }
         <div class="badge-row">
           @if (isFillingFast) { <div class="badge badge-orange">🔥 Filling fast</div> }
           @if (isBeginnerFriendly) { <div class="badge badge-green">🌿 Beginner friendly</div> }
@@ -31,20 +33,27 @@ const NEW_CLUB_DAYS = 30;
       <div class="body">
         <div class="title">{{ run.title }}</div>
         <div class="chip-row">
-          @if (run.club_name) {
-            <div class="club-chip">{{ run.club_name }}</div>
+          @if (run.clubName) {
+            <div class="club-chip">{{ run.clubName }}</div>
           }
           @if (runTypeLabel) {
             <div class="run-type-chip">{{ runTypeLabel.emoji }} {{ runTypeLabel.label }}</div>
           }
         </div>
         <div class="meta-row">
-          <span class="meta-text">{{ svc.formatDate(run.date) }} · {{ svc.formatTime(run.date) }}</span>
+          @if (validDate) {
+            <span class="meta-text">{{ svc.formatDate(validDate) }} · {{ svc.formatTime(validDate) }}</span>
+          }
           @if (run.pace) { <span class="pace-chip">{{ run.pace }}</span> }
           @for (tag of (run.tags ?? []); track tag) {
             <span class="tag-chip">{{ tag }}</span>
           }
         </div>
+        @if (run.maxAttendees) {
+          <div class="capacity-bar">
+            <div class="capacity-fill" [style.width.%]="capacityPct"></div>
+          </div>
+        }
         <div class="footer">
           <div class="facepile">
             @for (a of facepileAttendees; track a.id) {
@@ -54,12 +63,13 @@ const NEW_CLUB_DAYS = 30;
               <div class="fp-circle fp-extra">+{{ extraCount }}</div>
             }
             @if (run.attendees.length > 0) {
-              <span class="going-label">{{ run.attendees.length }} going</span>
+              <span class="live-badge"><span class="live-dot"></span>{{ run.attendees.length }} going</span>
             } @else {
               <span class="going-label no-going">Be the first</span>
             }
           </div>
-          <button class="join-btn" [class.joined]="isJoined" (click)="onJoin($event)">
+          <button class="join-btn" [class.joined]="isJoined" (click)="onJoin($event)"
+            [attr.aria-label]="isJoined ? 'Leave run: ' + run.title : 'Join run: ' + run.title">
             {{ isJoined ? '✓ Going' : "I'm coming" }}
           </button>
         </div>
@@ -96,6 +106,7 @@ const NEW_CLUB_DAYS = 30;
       font-size: 13px; font-weight: 600;
       letter-spacing: 0.02em;
     }
+    .dist-miles { font-size: 11px; font-weight: 500; opacity: 0.8; }
 
     .badge-row {
       position: absolute;
@@ -192,6 +203,23 @@ const NEW_CLUB_DAYS = 30;
     .facepile .fp-circle:first-child { margin-left: 0; }
     .fp-extra { background: #F7F7F5; color: #6B6B68; font-size: 9px; }
 
+    .live-badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      margin-left: 6px;
+      background: #E1F5EE; color: #0F6E56;
+      border-radius: 999px; padding: 3px 9px;
+      font-size: 12px; font-weight: 600;
+      white-space: nowrap;
+    }
+    .live-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: #1D9E75; flex-shrink: 0;
+      animation: pulse-dot 1.8s ease-in-out infinite;
+    }
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.45; transform: scale(0.75); }
+    }
     .going-label {
       font-size: 12px; color: #6B6B68;
       margin-left: 6px; white-space: nowrap;
@@ -208,6 +236,9 @@ const NEW_CLUB_DAYS = 30;
     }
     .join-btn:active { opacity: 0.8; }
     .join-btn.joined { background: #E1F5EE; color: #0F6E56; }
+
+    .capacity-bar { height: 3px; background: rgba(0,0,0,0.06); border-radius: 999px; margin-bottom: 12px; overflow: hidden; }
+    .capacity-fill { height: 100%; background: #1D9E75; border-radius: 999px; transition: width 0.3s ease; }
   `]
 })
 export class RunCardComponent {
@@ -220,6 +251,20 @@ export class RunCardComponent {
 
   get facepileAttendees() { return this.run.attendees.slice(0, 3); }
   get extraCount() { return Math.max(0, this.run.attendees.length - 3); }
+  get hasDistance(): boolean { return this.run.distanceKm != null && !isNaN(this.run.distanceKm) && this.run.distanceKm > 0; }
+  get distanceMiles(): string {
+    if (!this.hasDistance) return '0.0';
+    return (this.run.distanceKm * 0.621371).toFixed(1);
+  }
+  get validDate(): Date | null {
+    const d = new Date(this.run.date);
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  get capacityPct(): number {
+    if (!this.run.maxAttendees) return 0;
+    return Math.min(100, Math.round((this.run.attendees.length / this.run.maxAttendees) * 100));
+  }
 
   get isFillingFast(): boolean {
     if (!this.run.maxAttendees) return false;
@@ -228,7 +273,7 @@ export class RunCardComponent {
 
   get isBeginnerFriendly(): boolean {
     return this.run.pace === 'easy' || this.run.pace === 'social' ||
-      (this.run.tags ?? []).some(t => ['beginner', 'shakeout'].includes(t.toLowerCase()));
+      (this.run.tags ?? []).some(t => ['beginner', 'beginner-friendly', 'shakeout'].includes(t.toLowerCase()));
   }
 
   get runTypeLabel(): { label: string; emoji: string } | null {
@@ -247,18 +292,27 @@ export class RunCardComponent {
     return (Date.now() - new Date(this.run.club_created_at).getTime()) / 86400000 <= NEW_CLUB_DAYS;
   }
 
-  get routePath(): string {
-    const km = this.run.distanceKm ?? 0;
-    if (km < 5) {
-      // Short: gentle undulation
-      return 'M 28 58 Q 80 48 140 52 Q 200 56 252 44';
-    } else if (km <= 15) {
-      // Medium: moderate hills (original)
-      return 'M 28 58 Q 80 18 140 38 Q 200 58 252 22';
-    } else {
-      // Long: dramatic peaks
-      return 'M 28 58 Q 60 8 140 28 Q 210 50 252 12';
-    }
+  get routeGeometry(): { path: string; startY: number; endY: number } {
+    const start = this.run.startLocation;
+    const end = this.run.endLocation;
+    const km = this.run.distanceKm ?? 5;
+    const BASE_Y = 50;
+
+    // Map lat difference to Y offset: north end = higher on card (lower Y)
+    // 0.09° lat ≈ 10km; scale so ±0.1° → ±28px
+    const latDiff = (start && end) ? (end.lat - start.lat) : 0;
+    const startY = BASE_Y;
+    const endY = Math.max(8, Math.min(72, BASE_Y - latDiff * 280));
+
+    // Arc height grows with distance, peaks sooner for shorter runs
+    const amplitude = Math.max(10, Math.min(38, km * 2.2));
+    const ctrlY = Math.max(4, Math.min(startY, endY) - amplitude);
+
+    return {
+      path: `M 28 ${startY} Q 140 ${ctrlY.toFixed(1)} 252 ${endY.toFixed(1)}`,
+      startY,
+      endY: parseFloat(endY.toFixed(1)),
+    };
   }
 
   get bannerGradient(): string {

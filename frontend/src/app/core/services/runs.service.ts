@@ -13,7 +13,7 @@ export class RunsService {
   getRuns() { return this.runs; }
   getJoinedRunIds() { return this.joinedRunIds; }
 
-  private mapRun(r: any): RunEvent {
+  mapRun(r: any): RunEvent {
     return {
       id: r.id, clubId: r.club_id, clubName: r.club_name, title: r.title,
       startLocation: { lat: parseFloat(r.start_lat), lng: parseFloat(r.start_lng) },
@@ -96,20 +96,56 @@ export class RunsService {
     });
   }
 
+  getNextRunByClub(clubId: string, excludeRunId: string) {
+    return this.http.get<any[]>(`${environment.apiUrl}/runs`, { params: { club_id: clubId } }).pipe(
+      map(data => data.map(r => this.mapRun(r))
+        .filter(r => r.id !== excludeRunId && new Date(r.date) > new Date())
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+        [0] ?? null
+      )
+    );
+  }
+
+  getUserProfile(userId: string) {
+    return this.http.get<{
+      id: string;
+      display_name: string;
+      total_runs: number;
+      total_distance_km: number;
+      favorite_pace: string | null;
+      verified_pace: number | null;
+      recent_runs: { id: string; title: string; club_name: string; distance_km: number; pace: string | null; attended_date: string; strava_activity_id: number | null }[];
+    }>(`${environment.apiUrl}/users/${userId}/profile`);
+  }
+
+  linkStravaActivity(runId: string, payload: {
+    strava_activity_id: number;
+    strava_distance: number;
+    strava_moving_time: number;
+    strava_average_speed: number;
+    strava_polyline: string | null;
+  }) {
+    return this.http.post<{ success: boolean; data: any }>(`${environment.apiUrl}/runs/${runId}/link-strava`, payload);
+  }
+
   createRun(payload: CreateRunPayload) { return this.http.post<any>(`${environment.apiUrl}/runs`, payload); }
   updateRun(id: string, payload: any) { return this.http.patch<any>(`${environment.apiUrl}/runs/${id}`, payload); }
   deleteRun(id: string) { return this.http.delete<any>(`${environment.apiUrl}/runs/${id}`); }
   cancelRun(id: string) { return this.http.patch<any>(`${environment.apiUrl}/runs/${id}`, { status: 'cancelled' }); }
 
   formatDate(date: Date): string {
-    const diff = new Date(date).getTime() - Date.now();
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return '';
+    const diff = d.getTime() - Date.now();
     const days = Math.floor(diff / 86400000);
     if (days <= 0) return 'Today';
     if (days === 1) return 'Tomorrow';
-    return new Date(date).toLocaleDateString('en-GB', { weekday: 'long' });
+    return d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' });
   }
 
   formatTime(date: Date): string {
-    return new Date(date).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return '';
+    return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
   }
 }

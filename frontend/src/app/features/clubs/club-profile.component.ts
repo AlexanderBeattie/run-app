@@ -30,7 +30,10 @@ import { signal } from '@angular/core';
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
           </button>
           <div class="club-avatar">{{ club.name[0]?.toUpperCase() }}</div>
-          <div class="club-name">{{ club.name }}</div>
+          <div class="club-name-row">
+            <div class="club-name">{{ club.name }}</div>
+            @if (isVerified) { <div class="verified-badge" title="This club has hosted 10+ runs">✓ Verified</div> }
+          </div>
           @if (club.city) { <div class="club-city">{{ club.city }}</div> }
           @if (club.description) { <div class="club-desc">{{ club.description }}</div> }
           <div class="club-stats">
@@ -133,7 +136,9 @@ import { signal } from '@angular/core';
     .header { background: #0D0D0D; padding: 16px 16px 20px; display: flex; flex-direction: column; align-items: center; text-align: center; position: relative; }
     .back { position: absolute; top: 16px; left: 12px; background: none; border: none; color: rgba(255,255,255,0.7); cursor: pointer; display: flex; padding: 4px; flex-shrink: 0; }
     .club-avatar { width: 56px; height: 56px; border-radius: 14px; background: #E1F5EE; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 600; color: #0F6E56; margin-bottom: 12px; }
-    .club-name { font-size: 20px; font-weight: 500; color: #fff; margin-bottom: 4px; word-break: break-word; }
+    .club-name-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center; margin-bottom: 4px; }
+    .club-name { font-size: 20px; font-weight: 500; color: #fff; word-break: break-word; }
+    .verified-badge { display: inline-flex; align-items: center; gap: 4px; background: rgba(29,158,117,0.25); color: #1D9E75; border: 1px solid rgba(29,158,117,0.4); border-radius: 999px; padding: 3px 10px; font-size: 11px; font-weight: 600; white-space: nowrap; }
     .club-city { font-size: 13px; color: rgba(255,255,255,0.5); margin-bottom: 8px; }
     .club-desc { font-size: 13px; color: rgba(255,255,255,0.6); line-height: 1.5; margin-bottom: 14px; max-width: 100%; padding: 0 4px; }
     .club-stats { display: flex; gap: 16px; margin-bottom: 12px; }
@@ -142,7 +147,7 @@ import { signal } from '@angular/core';
     .sl { font-size: 10px; color: rgba(255,255,255,0.4); margin-top: 2px; }
     .tag-row { display: flex; gap: 4px; flex-wrap: wrap; justify-content: center; margin-bottom: 14px; }
     .tag { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.7); border-radius: 999px; padding: 3px 8px; font-size: 11px; font-weight: 500; }
-    .tag.pace { background: rgba(29,158,117,0.25); color: #1D9E75; }
+    .tag.pace { background: rgba(29,158,117,0.25); color: #1D9E75; text-transform: capitalize; }
     .join-btn { width: 100%; max-width: 280px; background: #1D9E75; color: #E1F5EE; border: none; border-radius: 12px; padding: 12px; font-size: 14px; font-weight: 500; cursor: pointer; font-family: inherit; }
     .join-btn.joined { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.6); }
     .owner-actions { display: flex; align-items: center; gap: 10px; }
@@ -179,6 +184,7 @@ export class ClubProfileComponent implements OnInit {
     clubId = '';
 
     get isOwner() { return this.club?.owner_id === this.auth.getUser()()?.id; }
+    get isVerified() { return (this.club?.total_runs_count ?? 0) >= 10; }
     get totalAttendance() { return this.runs.reduce((sum, r) => sum + (r.attendees?.length ?? 0), 0); }
 
     ngOnInit() {

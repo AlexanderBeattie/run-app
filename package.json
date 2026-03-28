@@ -20,9 +20,11 @@
     "test:backend": "npm run test --workspace=backend",
     "test:frontend": "npm run test --workspace=frontend",
     "test": "concurrently \"npm run test:frontend\" \"npm run test:backend\"",
-    "db:seed": "npm run db:seed --workspace=backend"
+    "db:seed": "npm run db:seed --workspace=backend",
+    "test:e2e": "playwright test"
   },
   "devDependencies": {
+    "@playwright/test": "^1.44.0",
     "concurrently": "^8.2.0",
     "dotenv": "^16.0.3",
     "typescript": "5.4.5"

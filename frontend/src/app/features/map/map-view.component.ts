@@ -131,6 +131,7 @@ export class MapViewComponent implements OnInit, AfterViewInit {
     this.map = new google.maps.Map(this.mapEl.nativeElement, {
       center: startLocation, zoom: 13,
       disableDefaultUI: true, zoomControl: true,
+      zoomControlOptions: { position: google.maps.ControlPosition.RIGHT_TOP },
       mapId: 'KLUB_MAP'
     });
 

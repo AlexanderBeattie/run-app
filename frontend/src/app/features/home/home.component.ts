@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, ChangeDetectorRef, signal, DestroyRef, HostListener } from '@angular/core';
+import { Component, inject, OnInit, ChangeDetectorRef, signal, computed, DestroyRef, HostListener } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
@@ -6,8 +6,11 @@ import { RunsService } from '../../core/services/runs.service';
 import { AuthService } from '../../core/services/auth.service';
 import { ClubService } from '../../core/services/club.service';
 import { ToastService } from '../../shared/services/toast.service';
+import { GeoService } from '../../core/services/geo.service';
+import { Coordinates } from '../../core/models/run-event.model';
 import { RunCardComponent } from '../../shared/components/run-card/run-card.component';
 import { RunDetailDialogComponent } from '../../shared/components/run-detail-dialog/run-detail-dialog.component';
+import { OnboardingComponent, OnboardingPrefs } from '../onboarding/onboarding.component';
 import { RunEvent, Club } from '../../core/models/run-event.model';
 import { Subject, debounceTime, distinctUntilChanged } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -16,7 +19,7 @@ import { environment } from '../../../environments/environment';
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [RunCardComponent, RunDetailDialogComponent, RouterLink, FormsModule],
+  imports: [RunCardComponent, RunDetailDialogComponent, OnboardingComponent, RouterLink, FormsModule],
   template: `
     <div class="page">
 
@@ -158,6 +161,28 @@ import { environment } from '../../../environments/environment';
         </div>
       }
 
+      <!-- Featured clubs -->
+      @if (featuredClubs().length > 0) {
+        <div class="section-header">
+          <span class="section-title">Featured Clubs</span>
+          <a class="section-link" routerLink="/clubs">See all</a>
+        </div>
+        <div class="featured-clubs-row">
+          @for (club of featuredClubs(); track club.id) {
+            <a class="fc-card" [routerLink]="['/clubs', club.id]">
+              <div class="fc-av" [style.background]="clubColor(club.id)">{{ club.name[0].toUpperCase() }}</div>
+              <div class="fc-info">
+                <div class="fc-name">{{ club.name }}</div>
+                <div class="fc-meta">{{ club.member_count }} members</div>
+                @if (club.pace) {
+                  <span class="fc-pace">{{ club.pace }}</span>
+                }
+              </div>
+            </a>
+          }
+        </div>
+      }
+
       <!-- Error message -->
       @if (errorMessage()) {
         <div class="error-banner">
@@ -174,7 +199,13 @@ import { environment } from '../../../environments/environment';
       <div class="feed-header">
         <div class="feed-header-top">
           @if (loaded) {
-            <span class="feed-count">{{ runsService.getRuns()().length }} runs near you</span>
+            <span class="feed-count">
+              @if (nearMeEnabled()) {
+                {{ feedRuns().length }} within {{ radiusMiles() }}mi
+              } @else {
+                {{ feedRuns().length }} runs
+              }
+            </span>
           } @else {
             <span class="feed-count">Finding runs...</span>
           }
@@ -184,12 +215,43 @@ import { environment } from '../../../environments/environment';
           </div>
         </div>
 
+        <!-- Near Me toggle row -->
+        <div class="near-me-row">
+          <button class="near-me-btn" [class.near-me-active]="nearMeEnabled()" (click)="toggleNearMe()">
+            Near Me
+          </button>
+          @if (nearMeEnabled()) {
+            <div class="radius-control">
+              <input class="radius-slider" type="range" min="1" max="25" step="1"
+                [value]="radiusMiles()"
+                (input)="setRadius(+$any($event.target).value)" />
+              <span class="radius-label">{{ radiusMiles() }} mi</span>
+            </div>
+          }
+        </div>
+
         <!-- Run type filter pills -->
         <div class="type-pills-row">
-          <button class="type-pill" [class.active]="activeRunType() === null" (click)="setRunType(null)">All</button>
+          <button class="type-pill" [class.active]="activeRunType() === null" aria-label="Show all run types" (click)="setRunType(null)">All</button>
           @for (t of runTypePills; track t.value) {
-            <button class="type-pill" [class.active]="activeRunType() === t.value" (click)="setRunType(t.value)">
+            <button class="type-pill" [class.active]="activeRunType() === t.value" [attr.aria-label]="'Filter by ' + t.label" (click)="setRunType(t.value)">
               {{ t.emoji }} {{ t.label }}
+            </button>
+          }
+        </div>
+
+        <!-- Pace filter pills -->
+        <div class="pace-pills-row">
+          <button class="pace-pill" [class.pace-active]="activePace() === null" aria-label="Show all paces" (click)="setPace(null)">All paces</button>
+          @for (p of pacePills; track p.value) {
+            <button class="pace-pill"
+              [class.pace-active]="activePace() === p.value"
+              [style.background]="activePace() === p.value ? p.color : ''"
+              [style.borderColor]="activePace() === p.value ? p.color : ''"
+              [style.color]="activePace() === p.value ? '#fff' : ''"
+              [attr.aria-label]="p.label + ' pace · ' + p.effort"
+              (click)="setPace(p.value)">
+              {{ p.label }}
             </button>
           }
         </div>
@@ -200,14 +262,14 @@ import { environment } from '../../../environments/environment';
           @for (i of [1,2,3]; track i) {
             <div class="skeleton"></div>
           }
-        } @else if (runsService.getRuns()().length === 0) {
+        } @else if (feedRuns().length === 0) {
           <div class="empty">
             <div class="empty-icon">🏃</div>
             <div class="empty-title">No runs found</div>
             <div class="empty-sub">Try a different filter or check back soon</div>
           </div>
         } @else {
-          @for (run of runsService.getRuns()(); track run.id) {
+          @for (run of feedRuns(); track run.id) {
             <app-run-card
               [run]="run"
               [isJoined]="runsService.getJoinedRunIds()().includes(run.id)"
@@ -225,6 +287,10 @@ import { environment } from '../../../environments/environment';
         [isJoined]="runsService.getJoinedRunIds()().includes(selectedRun()!.id)"
         (close)="selectedRun.set(null)"
         (join)="onJoin($event)" />
+    }
+
+    @if (showOnboarding()) {
+      <app-onboarding (complete)="onOnboardingComplete($event)" />
     }
   `,
   styles: [`
@@ -476,6 +542,50 @@ import { environment } from '../../../environments/environment';
       text-align: center;
     }
 
+    /* ── Featured clubs ─────────────────────────────────────── */
+    .featured-clubs-row {
+      display: flex;
+      gap: 10px;
+      padding: 0 16px 24px;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    .featured-clubs-row::-webkit-scrollbar { display: none; }
+
+    .fc-card {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+      background: #fff;
+      border-radius: 14px;
+      padding: 10px 14px;
+      text-decoration: none;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.07), 0 0 0 0.5px rgba(0,0,0,0.05);
+      min-width: 160px;
+    }
+    .fc-av {
+      width: 40px; height: 40px;
+      border-radius: 12px;
+      flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; font-weight: 700; color: #fff;
+    }
+    .fc-info { min-width: 0; }
+    .fc-name {
+      font-size: 13px; font-weight: 600; color: #0D0D0D;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .fc-meta { font-size: 11px; color: #9B9B98; margin-top: 1px; }
+    .fc-pace {
+      display: inline-block;
+      margin-top: 4px;
+      font-size: 10px; font-weight: 600;
+      background: #E1F5EE; color: #0F6E56;
+      border-radius: 999px; padding: 2px 8px;
+      text-transform: capitalize;
+    }
+
     /* ── Horizontal run carousel ─────────────────────────────── */
     .h-carousel {
       display: flex;
@@ -536,6 +646,35 @@ import { environment } from '../../../environments/environment';
       padding-right: 20px;
     }
     .type-pills-row::-webkit-scrollbar { display: none; }
+
+    .pace-pills-row {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      padding-top: 10px;
+      margin: 0 -20px;
+      padding-left: 20px;
+      padding-right: 20px;
+    }
+    .pace-pills-row::-webkit-scrollbar { display: none; }
+
+    .pace-pill {
+      flex-shrink: 0;
+      background: #F7F7F5;
+      border: 1.5px solid transparent;
+      border-radius: 999px;
+      padding: 6px 14px;
+      font-size: 13px; font-weight: 500;
+      color: #6B6B68;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 0.12s, color 0.12s, border-color 0.12s;
+      white-space: nowrap;
+    }
+    .pace-pill.pace-active {
+      border-color: currentColor;
+    }
 
     .type-pill {
       flex-shrink: 0;
@@ -644,6 +783,49 @@ import { environment } from '../../../environments/environment';
       margin-left: auto;
       flex-shrink: 0;
     }
+
+    /* ── Near Me ─────────────────────────────────────────────── */
+    .near-me-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding-top: 10px;
+    }
+    .near-me-btn {
+      flex-shrink: 0;
+      background: #F7F7F5;
+      border: 1.5px solid transparent;
+      border-radius: 999px;
+      padding: 6px 14px;
+      font-size: 13px; font-weight: 500;
+      color: #6B6B68;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 0.12s, color 0.12s, border-color 0.12s;
+    }
+    .near-me-btn.near-me-active {
+      background: #E1F5EE;
+      color: #0F6E56;
+      border-color: #1D9E75;
+    }
+    .radius-control {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 1;
+    }
+    .radius-slider {
+      flex: 1;
+      accent-color: #1D9E75;
+      cursor: pointer;
+    }
+    .radius-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: #0F6E56;
+      min-width: 32px;
+      text-align: right;
+    }
   `]
 })
 export class HomeComponent implements OnInit {
@@ -654,6 +836,7 @@ export class HomeComponent implements OnInit {
   cdr = inject(ChangeDetectorRef);
   destroyRef = inject(DestroyRef);
   private http = inject(HttpClient);
+  private geoService = inject(GeoService);
 
   selectedRun = signal<RunEvent | null>(null);
   errorMessage = signal<string | null>(null);
@@ -662,6 +845,33 @@ export class HomeComponent implements OnInit {
   clubs = signal<Club[]>([]);
   feedMode = signal<'all' | 'mine'>('all');
   activeRunType = signal<string | null>(null);
+  activePace = signal<string | null>(null);
+  showOnboarding = signal(false);
+  userCoordinates = signal<Coordinates | null>(null);
+  nearMeEnabled = signal(false);
+  radiusMiles = signal(10);
+
+  readonly feedRuns = computed(() => {
+    const pace = this.activePace();
+    let runs = this.runsService.getRuns()();
+
+    if (this.nearMeEnabled()) {
+      const coords = this.userCoordinates();
+      if (coords) {
+        const radiusKm = this.geoService.milesToKilometers(this.radiusMiles());
+        runs = runs.filter(r => {
+          const loc = r.startLocation;
+          if (!loc || isNaN(loc.lat) || isNaN(loc.lng)) return false;
+          return this.geoService.calculateDistance(coords, loc) <= radiusKm;
+        });
+      }
+    }
+
+    if (!pace) return runs;
+    return runs.filter(r => r.pace === pace);
+  });
+
+  readonly featuredClubs = computed(() => this.clubs().slice(0, 4));
   locationLabel = signal('Locating...');
   searchResults = signal<RunEvent[]>([]);
   showDropdown = signal(false);
@@ -676,6 +886,14 @@ export class HomeComponent implements OnInit {
   private readonly clubColours = [
     '#1D9E75', '#3B82F6', '#F59E0B', '#EC4899',
     '#8B5CF6', '#EF4444', '#10B981', '#6366F1',
+  ];
+
+  readonly pacePills = [
+    { value: 'social',   label: 'Social',   color: '#10B981', effort: 'chatty pace' },
+    { value: 'easy',     label: 'Easy',     color: '#1D9E75', effort: 'relaxed pace' },
+    { value: 'moderate', label: 'Moderate', color: '#3B82F6', effort: 'steady effort' },
+    { value: 'fast',     label: 'Fast',     color: '#EF4444', effort: 'push pace' },
+    { value: 'tempo',    label: 'Tempo',    color: '#F59E0B', effort: 'race effort' },
   ];
 
   readonly runTypePills = [
@@ -720,7 +938,14 @@ export class HomeComponent implements OnInit {
     }
   }
 
+  onOnboardingComplete(prefs: OnboardingPrefs) {
+    this.showOnboarding.set(false);
+    if (prefs.pace) this.activePace.set(prefs.pace);
+  }
+
   ngOnInit() {
+    if (!localStorage.getItem('onboarded')) this.showOnboarding.set(true);
+    this.loadGeoPreferences();
     this.detectLocation();
     this.loadWithParams();
     this.loadCarousels();
@@ -752,6 +977,28 @@ export class HomeComponent implements OnInit {
     });
   }
 
+  private loadGeoPreferences() {
+    const enabled = localStorage.getItem('nearMeEnabled');
+    const radius = localStorage.getItem('nearMeRadius');
+    if (enabled === 'true') this.nearMeEnabled.set(true);
+    if (radius) this.radiusMiles.set(Number(radius));
+  }
+
+  toggleNearMe() {
+    if (!this.nearMeEnabled() && !this.userCoordinates()) {
+      this.toast.show('Enable location to use Near Me filter');
+      return;
+    }
+    const next = !this.nearMeEnabled();
+    this.nearMeEnabled.set(next);
+    localStorage.setItem('nearMeEnabled', String(next));
+  }
+
+  setRadius(miles: number) {
+    this.radiusMiles.set(miles);
+    localStorage.setItem('nearMeRadius', String(miles));
+  }
+
   private detectLocation() {
     if (!navigator.geolocation) {
       this.locationLabel.set('Near you');
@@ -760,6 +1007,7 @@ export class HomeComponent implements OnInit {
     navigator.geolocation.getCurrentPosition(
       pos => {
         const { latitude, longitude } = pos.coords;
+        this.userCoordinates.set({ lat: latitude, lng: longitude });
         this.http.get<{ formatted_address: string }>(`${environment.apiUrl}/geocode?address=${latitude},${longitude}`)
           .subscribe({
             next: r => {
@@ -852,6 +1100,8 @@ export class HomeComponent implements OnInit {
     this.activeRunType.set(type);
     this.loadWithParams();
   }
+
+  setPace(pace: string | null) { this.activePace.set(pace); }
 
   private loadWithParams() {
     this.loaded = false;

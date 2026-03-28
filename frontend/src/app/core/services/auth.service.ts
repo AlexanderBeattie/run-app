@@ -69,6 +69,14 @@ export class AuthService {
     this.currentUser.set(res.user);
   }
 
+  setStravaConnected() {
+    const user = this.currentUser();
+    if (!user) return;
+    const updated = { ...user, stravaConnected: true };
+    localStorage.setItem('klub_user', JSON.stringify(updated));
+    this.currentUser.set(updated);
+  }
+
   logout() {
     const refreshToken = localStorage.getItem('klub_refresh_token');
     if (refreshToken) {

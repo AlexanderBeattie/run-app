@@ -1,60 +1,89 @@
 # KLUB — Task Queue
 
-## Status: Phase 4 — Deployment Readiness
+## Status: Phase 6a — Strava Integration Sprint
 
 > Full post-launch roadmap → `tasks/roadmap.md` (not loaded automatically)
 
 ---
 
-## Active Sprint: Phase 4
+## Active Sprint: Phase 6a — Strava Integration
 
-### Security — blockers before public launch
-> Context: zero file reads — all external config; trust CLAUDE.md for env var names
-- [ ] Google Maps API key: add HTTP referrer restrictions in Google Cloud Console
-- [ ] Google Maps API key: restrict to Maps JS + Geocoding + Directions APIs only
-- [ ] Backend geocode key: add server IP restriction (Render static IP or proxy)
-- [ ] Run migration-001.sql on production DB (club_members table, clubs pace/tags/city/logo_url columns, run_events pace/tags columns)
-- [ ] Run migration-002.sql on production DB (refresh_tokens table)
-- [ ] Run migration-003.sql on production DB (password_reset_tokens table)
-- [ ] Run migration-004.sql on production DB (run_events run_type column)
-- [ ] Schedule periodic cleanup of expired refresh tokens on Render (daily cron → `npm run db:cleanup-tokens`)
-- [ ] Audit CORS_ORIGIN in production env — must be exact Netlify URL, not wildcard
+### 1. Database Schema & Migrations
+> Context: `backend/src/db/` (new migration file) + `schema.sql`
+- [x] Create `migration-005.sql` to add Strava columns to `users`: `strava_athlete_id` (BIGINT), `strava_access_token` (TEXT), `strava_refresh_token` (TEXT), `strava_token_expires_at` (BIGINT).
+- [x] Add Strava columns to `run_attendees`: `strava_activity_id` (BIGINT), `strava_distance` (FLOAT), `strava_moving_time` (INT), `strava_average_speed` (FLOAT), `strava_polyline` (TEXT).
+- [x] Update `schema.sql` to reflect these new columns.
+- [x] **Continuation:** Create a dedicated `strava_webhooks` table to handle future automated activity syncing via Strava's Webhook API.
 
-> Note: `schema.sql` is now canonical (includes all migrations). Use for fresh installs only — run individual migration files against an existing production DB.
+### 2. OAuth 2.0 Flow (Backend)
+> Context: `auth.routes.ts` + `users.routes.ts`
+- [x] Add `STRAVA_CLIENT_ID` and `STRAVA_CLIENT_SECRET` to `.env.example` and backend config.
+- [x] Create `GET /api/auth/strava` which redirects the user to Strava's OAuth authorize URL requesting `activity:read` scope.
+- [x] Create `GET /api/auth/strava/callback` to handle the return redirect, exchange the `code` for tokens via `POST https://www.strava.com/api/v3/oauth/token`, and save them to the authenticated user's DB record.
+- [ ] **Continuation:** Implement a token-refresh middleware that automatically refreshes the `strava_access_token` if `strava_token_expires_at` has passed.
 
-### PWA
-> Context: read `angular.json` + `ngsw-config.json` only
-- [ ] Fix ngsw-worker.js 404 (Netlify serving issue)
-- [ ] Fix manifest.webmanifest MIME type not served correctly on Netlify
-- [ ] KLUB branded icons (192×192, 512×512, maskable variant)
-- [ ] Custom install-to-homescreen prompt banner
+### 3. Connect Strava UI (Frontend)
+> Context: `runner-profile.component.ts` (or settings view) + `auth.service.ts`
+- [x] Add a "Connect with Strava" button (using official Strava branding/orange `#FC4C02`).
+- [x] Wire the button to hit the new `GET /api/auth/strava` endpoint.
+- [x] Display a "Connected to Strava" success state if the current user profile has a `strava_athlete_id`.
+- [ ] **Continuation:** Add a "Disconnect Strava" button that clears the tokens from the DB and revokes access via Strava's deauthorization endpoint.
 
-### Infra
-> Context: zero file reads — external verification only
-- [ ] Verify Render backend auto-deploys from main
-- [ ] Verify Netlify build pipeline runs generate-env.js correctly
-- [ ] Smoke test all API endpoints against production DB after migrations
+### 4. Fetch & Link Activities (Full-Stack)
+> Context: `runs.routes.ts` + `run-detail-dialog.component.ts` + new `strava-selector-modal.component.ts`
+- [x] **Backend:** Create `GET /api/users/strava/activities` that proxies to `https://www.strava.com/api/v3/athlete/activities?per_page=10` using the user's stored token. Filter for `type === 'Run' || type === 'TrailRun'`.
+- [x] **Backend:** Create `POST /api/runs/:id/link-strava` to save the selected `activity_id` and stats (`distance`, `moving_time`, `average_speed`, `map.summary_polyline`) to the user's `run_attendees` row.
+- [x] **Frontend:** In `run-detail-dialog`, if the run is in the past and the user attended, show a "Link Strava Run" button.
+- [x] **Frontend:** Build a modal that fetches and lists the recent Strava runs. Clicking one saves the link via the new POST endpoint.
+- [ ] **Continuation:** Auto-suggest the correct Strava run by comparing the KLUB `event_date` to the Strava `start_date_local`.
+
+### 5. Verified Profile Stats (Frontend)
+> Context: `runner-profile-dialog.component.ts` + `users.routes.ts`
+- [x] **Backend:** Update the `GET /api/users/:id/profile` endpoint. If the user has linked Strava runs, calculate their true average pace (`(1000 / average_speed) / 60`) from the `run_attendees` data and pass it as `verified_pace`.
+- [x] **Frontend:** Update the profile card to display the "Verified Pace" with an orange Strava verification checkmark.
+- [x] **Frontend:** In the "Recent Runs" list, add a small Strava icon next to runs that have linked data.
+- [ ] **Continuation:** Display the linked Strava polyline snippet as a tiny background graphic on the recent run list items.
 
 ---
 
 ## Completed
 
-### Phase 4 — Deployment Readiness
+### Phase 4d — High-Impact UX Sprint
+- [x] Club Search & Filter (client-side matching name, city, pace, tags)
+- [x] Social Proof Badges (live attendee counts, verified club checkmarks)
+- [x] Run Detail Upgrades (kit checklists, next run by club footer)
+- [x] Post-Run Share Card (Canvas API image generation, Web Share API integration)
+- [x] Geo-Filter (navigator.geolocation + Haversine distance sorting)
+- [x] Runner Profile Cards (clickable avatars, profile API endpoint, polished modal)
 
-- [x] **Security hardening (backend):** rate limiting (login 5/15min, register 3/hr, API 100/15min), password validation (8–128 chars), email validation, role locked to runner on register, JWT expiry 1h (was 7d), refresh token system (`refresh_tokens` table, hashed, 30d expiry), `/auth/refresh` + `/auth/logout` endpoints, token revocation on logout, expired token cleanup script (`npm run db:cleanup-tokens`) — 87 backend tests, 5 suites green
-- [x] **Security hardening (frontend):** AuthService stores `refreshToken` + `expiresIn`, `isTokenExpired()` with 60s buffer, `refresh()` observable, logout invalidates server-side token; JWT interceptor — proactive refresh before expiry, skips `/auth/` routes, force-logout on refresh failure
-- [x] **Password reset:** `POST /api/auth/forgot-password` + `POST /api/auth/reset-password` (hashed token, time-limited, used flag); ForgotPasswordComponent + ResetPasswordComponent (standalone, lazy loaded); migration-003.sql
-- [x] **Maps API:** `google.maps.Marker` → `AdvancedMarkerElement` in run-organiser-dialog; DirectionsService v2 confirmed valid, no deprecation
-- [x] **DB schema consolidated:** schema.sql now canonical — all migrations 001–004 included, constraints on role/status/run_type, 11 indexes added
-- [x] **Seed script** (`backend/src/db/seed.ts`): 5 users, 2 clubs, 7 runs (all run_types covered), 14 attendee registrations — `npm run db:seed` from root or backend; migrations 003 + 004 applied locally
+### Phase 4c — Visual Enhancement Sprint
+- [x] Pace + tags on create-run form
+- [x] Standardise club pace field format to labels
+- [x] Pace-aware estimated duration on create-run form
+- [x] Pace hint label on create-run form
+- [x] Fix map zoom button hidden behind runs drawer
+- [x] Verify organiser dashboard active / past run filtering
+- [x] Inclusivity and accessibility improvements
+- [x] Run card & detail dialog visual polish
+- [x] Onboarding flow (3-screen wizard with localStorage)
+- [x] "Open in Maps" + meeting point UX
+- [x] Home feed filter pills
+- [x] Featured clubs section on home
+
+### Phase 4b — Run Card & UX Polish
+- [x] Seed data (Glasgow-based runs)
+- [x] Route art (dynamic SVG elevation)
+
+### Phase 4 — Deployment Readiness
+- [x] Security hardening (backend rate limiting, JWT expiry, refresh tokens)
+- [x] Security hardening (frontend AuthService interceptors)
+- [x] Password reset (Forgot/Reset password flow)
+- [x] Maps API updates (AdvancedMarkerElement)
+- [x] DB schema consolidated (schema.sql canonical)
+- [x] Seed script initialized
 
 ### Phase A1 — Ahead of schedule
-
-- [x] **run_type end-to-end:** migration-004.sql, backend filter/CRUD, frontend model + service, RunCard chip, CreateRun selector, HomeComponent filter pills — 110 tests green
+- [x] run_type end-to-end (enums, badges, filters)
 
 ### Phases 1–3
-
-- [x] **Phase 1–2:** full feature set — runs, clubs, maps, geocoding, toasts, nav, ownership
-- [x] **Phase 3a:** test coverage — 12 suites / 109 tests, all green
-- [x] **Phase 3b–e:** form validation, toasts, organiser dashboard, UI polish
-- [x] **Phase 3f:** discovery feed — carousels, badges, weather, Web Share API
+- [x] Core feature set, maps, geocoding, test coverage, discovery feed.

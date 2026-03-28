@@ -1,6 +1,5 @@
 import { Component, inject } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
-import { AuthService } from '../../../core/services/auth.service';
 
 @Component({
   selector: 'app-bottom-nav',
@@ -39,27 +38,15 @@ import { AuthService } from '../../../core/services/auth.service';
         <span>Clubs</span>
       </a>
 
-      @if (auth.isOrganizer()) {
-        <a class="nav-item" routerLink="/organiser" [class.active]="isActive('/organiser')">
-          <div class="icon-wrap" [class.active]="isActive('/organiser')">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" [attr.stroke]="isActive('/organiser') ? '#fff' : '#9B9B98'" stroke-width="2">
-              <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
-              <rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
-            </svg>
-          </div>
-          <span>Dashboard</span>
-        </a>
-      } @else {
-        <a class="nav-item" routerLink="/profile" [class.active]="isActive('/profile')">
-          <div class="icon-wrap" [class.active]="isActive('/profile')">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" [attr.stroke]="isActive('/profile') ? '#fff' : '#9B9B98'" stroke-width="2">
-              <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/>
-              <circle cx="12" cy="7" r="4"/>
-            </svg>
-          </div>
-          <span>Profile</span>
-        </a>
-      }
+      <a class="nav-item" routerLink="/profile" [class.active]="isActive('/profile')">
+        <div class="icon-wrap" [class.active]="isActive('/profile')">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" [attr.stroke]="isActive('/profile') ? '#fff' : '#9B9B98'" stroke-width="2">
+            <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/>
+            <circle cx="12" cy="7" r="4"/>
+          </svg>
+        </div>
+        <span>Profile</span>
+      </a>
     </nav>
   `,
   styles: [`
@@ -77,7 +64,6 @@ import { AuthService } from '../../../core/services/auth.service';
   `]
 })
 export class BottomNavComponent {
-  auth = inject(AuthService);
   router = inject(Router);
   isActive(path: string) { return this.router.url.startsWith(path); }
 }

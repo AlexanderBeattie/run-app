@@ -26,8 +26,19 @@ import { Club } from '../../core/models/run-event.model';
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(0,0,0,0.35)" stroke-width="2.5">
             <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
           </svg>
-          <input type="text" [(ngModel)]="searchQuery" placeholder="Search clubs..." (input)="filterClubs()" />
+          <input type="text" [(ngModel)]="searchQuery" placeholder="Search clubs..." (input)="onSearchInput()" (blur)="saveRecentSearch()" (keydown.enter)="saveRecentSearch()" />
+          @if (searchQuery) {
+            <button class="search-clear" (click)="clearSearch()">×</button>
+          }
         </div>
+        @if (!searchQuery && recentSearches().length > 0) {
+          <div class="recent-chips">
+            @for (q of recentSearches(); track q) {
+              <button class="chip" (click)="applyRecent(q)">{{ q }}</button>
+              <button class="chip-remove" (click)="removeRecent(q)">×</button>
+            }
+          </div>
+        }
       </div>
 
       <div class="content">
@@ -92,6 +103,10 @@ import { Club } from '../../core/models/run-event.model';
     .search-row { padding: 14px 12px 0; }
     .search-box { background: #fff; border: 0.5px solid rgba(0,0,0,0.1); border-radius: 12px; padding: 10px 12px; display: flex; align-items: center; gap: 8px; }
     .search-box input { border: none; outline: none; font-size: 14px; font-family: inherit; flex: 1; background: transparent; color: #0D0D0D; min-width: 0; }
+    .search-clear { background: none; border: none; font-size: 18px; color: rgba(0,0,0,0.3); cursor: pointer; padding: 0; line-height: 1; flex-shrink: 0; }
+    .recent-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; align-items: center; }
+    .chip { background: #fff; border: 0.5px solid rgba(0,0,0,0.12); border-radius: 999px; padding: 5px 10px; font-size: 12px; color: #6B6B68; font-family: inherit; cursor: pointer; }
+    .chip-remove { background: none; border: none; font-size: 14px; color: rgba(0,0,0,0.25); cursor: pointer; padding: 0 2px; margin-left: -4px; font-family: inherit; }
     .content { padding: 14px 12px 24px; }
 
     /* ── Error banner ─────────────────────────────────────────── */
@@ -178,7 +193,7 @@ import { Club } from '../../core/models/run-event.model';
     .club-name { font-size: 15px; font-weight: 500; color: #0D0D0D; margin-bottom: 2px; }
     .club-city { font-size: 12px; color: #6B6B68; margin-bottom: 4px; }
     .club-meta { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #9B9B98; }
-    .pace-tag { background: #F7F7F5; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 500; color: #6B6B68; }
+    .pace-tag { background: #F7F7F5; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 500; color: #6B6B68; text-transform: capitalize; }
     .club-right { text-align: right; flex-shrink: 0; }
     .next-run { font-size: 10px; color: #9B9B98; text-transform: uppercase; letter-spacing: 0.04em; }
     .next-date { font-size: 13px; font-weight: 500; color: #1D9E75; }
@@ -188,14 +203,19 @@ export class ClubListComponent implements OnInit {
     clubService = inject(ClubService);
     auth = inject(AuthService);
     cdr = inject(ChangeDetectorRef);
+    private static readonly STORAGE_KEY = 'klub_recent_searches';
+    private static readonly MAX_RECENT = 5;
+
     clubs: Club[] = [];
     filteredClubs: Club[] = [];
     searchQuery = '';
     loaded = false;
     loading = signal(false);
     errorMessage = signal<string | null>(null);
+    recentSearches = signal<string[]>([]);
 
     ngOnInit() {
+        this.recentSearches.set(this.loadRecentSearches());
         this.loading.set(true);
         this.clubService.listClubs().subscribe({
             next: (data) => {
@@ -215,12 +235,52 @@ export class ClubListComponent implements OnInit {
         });
     }
 
+    onSearchInput() {
+        this.filterClubs();
+    }
+
     filterClubs() {
         const q = this.searchQuery.toLowerCase().trim();
         if (!q) { this.filteredClubs = this.clubs; return; }
         this.filteredClubs = this.clubs.filter(c =>
-            c.name.toLowerCase().includes(q) || (c.city?.toLowerCase().includes(q) ?? false)
+            c.name.toLowerCase().includes(q) ||
+            (c.city?.toLowerCase().includes(q) ?? false) ||
+            (c.pace?.toLowerCase().includes(q) ?? false) ||
+            (c.tags?.some(t => t.toLowerCase().includes(q)) ?? false)
         );
+    }
+
+    saveRecentSearch() {
+        const q = this.searchQuery.trim();
+        if (!q) return;
+        const updated = [q, ...this.loadRecentSearches().filter(r => r !== q)]
+            .slice(0, ClubListComponent.MAX_RECENT);
+        localStorage.setItem(ClubListComponent.STORAGE_KEY, JSON.stringify(updated));
+        this.recentSearches.set(updated);
+    }
+
+    applyRecent(q: string) {
+        this.searchQuery = q;
+        this.filterClubs();
+    }
+
+    removeRecent(q: string) {
+        const updated = this.loadRecentSearches().filter(r => r !== q);
+        localStorage.setItem(ClubListComponent.STORAGE_KEY, JSON.stringify(updated));
+        this.recentSearches.set(updated);
+    }
+
+    clearSearch() {
+        this.searchQuery = '';
+        this.filterClubs();
+    }
+
+    private loadRecentSearches(): string[] {
+        try {
+            return JSON.parse(localStorage.getItem(ClubListComponent.STORAGE_KEY) ?? '[]');
+        } catch {
+            return [];
+        }
     }
 
     formatDate(dateStr: string) {

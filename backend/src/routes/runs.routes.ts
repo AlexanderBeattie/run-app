@@ -7,7 +7,7 @@ const router = Router();
 // GET /api/runs — with optional filters: ?search=, ?distance_min=, ?date=today|tomorrow|week, ?city=, ?club_id=, ?pace=
 router.get('/', async (req: Request, res: Response) => {
   try {
-    const conditions: string[] = ["r.status = 'active'"];
+    const conditions: string[] = ["r.status = 'active'", "r.event_date >= CURRENT_TIMESTAMP"];
     const params: any[] = [];
     let idx = 1;
 
@@ -225,6 +225,52 @@ router.delete('/:id', requireAuth, async (req: AuthRequest, res: Response) => {
     await pool.query('DELETE FROM run_events WHERE id = $1', [id]);
     res.json({ success: true });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// POST /api/runs/:id/link-strava — save selected Strava activity to run_attendees
+router.post('/:id/link-strava', requireAuth, async (req: AuthRequest, res: Response) => {
+  const { id } = req.params;
+  const userId = req.user!.id;
+  const { strava_activity_id, strava_distance, strava_moving_time, strava_average_speed, strava_polyline } = req.body;
+
+  if (!strava_activity_id) {
+    res.status(400).json({ error: 'strava_activity_id is required' });
+    return;
+  }
+
+  try {
+    const attendeeCheck = await pool.query(
+      'SELECT 1 FROM run_attendees WHERE run_id = $1 AND user_id = $2',
+      [id, userId]
+    );
+
+    if (!attendeeCheck.rows.length) {
+      res.status(403).json({ error: 'You are not an attendee of this run' });
+      return;
+    }
+
+    const result = await pool.query(
+      `UPDATE run_attendees
+       SET strava_activity_id = $1, strava_distance = $2, strava_moving_time = $3,
+           strava_average_speed = $4, strava_polyline = $5
+       WHERE run_id = $6 AND user_id = $7
+       RETURNING *`,
+      [
+        strava_activity_id,
+        strava_distance ?? null,
+        strava_moving_time ?? null,
+        strava_average_speed ?? null,
+        strava_polyline ?? null,
+        id,
+        userId,
+      ]
+    );
+
+    res.json({ success: true, data: result.rows[0] });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
 });
 
 router.post('/:id/join', requireAuth, async (req: AuthRequest, res: Response) => {

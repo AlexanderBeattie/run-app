@@ -1,5 +1,5 @@
 -- KLUB — Canonical Database Schema
--- Includes all migrations (001–004). Use this for fresh installs.
+-- Includes all migrations (001–005). Use this for fresh installs.
 -- Run: psql $DATABASE_URL -f backend/src/db/schema.sql
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -11,7 +11,11 @@ CREATE TABLE IF NOT EXISTS users (
   email         VARCHAR(255) UNIQUE NOT NULL,
   password_hash VARCHAR(255) NOT NULL,
   role          VARCHAR(20)  NOT NULL DEFAULT 'runner',
-  strava_connected BOOLEAN   DEFAULT false,
+  strava_connected         BOOLEAN   DEFAULT false,
+  strava_athlete_id        BIGINT    UNIQUE,
+  strava_access_token      TEXT,
+  strava_refresh_token     TEXT,
+  strava_token_expires_at  BIGINT,
   created_at    TIMESTAMP    DEFAULT NOW(),
   CONSTRAINT users_role_check CHECK (role IN ('runner', 'organizer'))
 );
@@ -25,9 +29,11 @@ CREATE TABLE IF NOT EXISTS clubs (
   member_count INTEGER      DEFAULT 0,
   logo_url     TEXT,
   city         VARCHAR(100),
+  -- pace uses the same label set as run_events.pace: 'easy' | 'social' | 'moderate' | 'fast' | 'tempo'
   pace         VARCHAR(20),
   tags         TEXT[]       DEFAULT '{}',
-  created_at   TIMESTAMP    DEFAULT NOW()
+  created_at   TIMESTAMP    DEFAULT NOW(),
+  CONSTRAINT clubs_pace_check CHECK (pace IN ('easy', 'social', 'moderate', 'fast', 'tempo') OR pace IS NULL)
 );
 
 -- ─── Club Members ─────────────────────────────────────────────────────────────
@@ -71,8 +77,27 @@ CREATE TABLE IF NOT EXISTS run_events (
 CREATE TABLE IF NOT EXISTS run_attendees (
   run_id    UUID      REFERENCES run_events(id) ON DELETE CASCADE,
   user_id   UUID      REFERENCES users(id)      ON DELETE CASCADE,
-  joined_at TIMESTAMP DEFAULT NOW(),
+  joined_at             TIMESTAMP DEFAULT NOW(),
+  strava_activity_id    BIGINT,
+  strava_distance       FLOAT,
+  strava_moving_time    INTEGER,
+  strava_average_speed  FLOAT,
+  strava_polyline       TEXT,
   PRIMARY KEY (run_id, user_id)
+);
+
+-- ─── Strava Webhooks ──────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS strava_webhooks (
+  id              BIGSERIAL    PRIMARY KEY,
+  user_id         UUID         NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  object_type     VARCHAR(20)  NOT NULL,  -- 'activity' | 'athlete'
+  object_id       BIGINT       NOT NULL,  -- Strava activity or athlete ID
+  aspect_type     VARCHAR(20)  NOT NULL,  -- 'create' | 'update' | 'delete'
+  event_time      BIGINT       NOT NULL,  -- Unix timestamp from Strava
+  subscription_id BIGINT,                 -- Strava webhook subscription ID
+  updates         JSONB,                  -- key/value pairs from update events
+  processed       BOOLEAN      NOT NULL DEFAULT false,
+  created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
 
 -- ─── Refresh Tokens ───────────────────────────────────────────────────────────
@@ -106,3 +131,8 @@ CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_id            ON refresh_toke
 CREATE INDEX IF NOT EXISTS idx_refresh_tokens_token_hash         ON refresh_tokens(token_hash);
 CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_token_hash  ON password_reset_tokens(token_hash);
 CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_user_id     ON password_reset_tokens(user_id);
+CREATE INDEX IF NOT EXISTS idx_users_strava_athlete_id             ON users(strava_athlete_id);
+CREATE INDEX IF NOT EXISTS idx_run_attendees_strava_activity_id    ON run_attendees(strava_activity_id);
+CREATE INDEX IF NOT EXISTS idx_strava_webhooks_user_id             ON strava_webhooks(user_id);
+CREATE INDEX IF NOT EXISTS idx_strava_webhooks_object_id           ON strava_webhooks(object_id);
+CREATE INDEX IF NOT EXISTS idx_strava_webhooks_processed           ON strava_webhooks(processed) WHERE processed = false;

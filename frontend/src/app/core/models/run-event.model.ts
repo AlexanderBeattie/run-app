@@ -29,10 +29,20 @@ export interface Club {
   id: string; name: string; description: string;
   owner_id: string; city?: string; pace?: string;
   tags?: string[]; logo_url?: string;
-  member_count: number; active_run_count?: number;
+  member_count: number; active_run_count?: number; total_runs_count?: number;
   next_run_date?: string; created_at: string;
 }
 export interface ClubMember {
   id: string; display_name: string;
   role: string; joined_at: string;
+}
+export interface StravaActivity {
+  id: number;
+  name: string;
+  distance: number;
+  moving_time: number;
+  average_speed: number;
+  start_date_local: string;
+  polyline: string | null;
+  type: string;
 }

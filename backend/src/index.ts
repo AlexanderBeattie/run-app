@@ -7,6 +7,8 @@ import authRoutes from './routes/auth.routes';
 import runsRoutes from './routes/runs.routes';
 import clubsRoutes from './routes/clubs.routes';
 import geocodeRoutes from './routes/geocode.routes';
+import usersRoutes from './routes/users.routes';
+import stravaRoutes from './routes/strava.routes';
 import { loginLimiter, registerLimiter, geocodeLimiter, apiLimiter } from './middleware/rate-limit.middleware';
 
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
@@ -38,6 +40,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/runs', runsRoutes);
 app.use('/api/clubs', clubsRoutes);
 app.use('/api/geocode', geocodeRoutes);
+app.use('/api/users', usersRoutes);
+app.use('/api/auth', stravaRoutes);
 
 app.get('/api/health', (_req, res) => {
   res.json({
@@ -50,6 +54,11 @@ async function start() {
   const jwtSecret = process.env.JWT_SECRET;
   if (!jwtSecret || jwtSecret.length < 32) {
     console.error('FATAL: JWT_SECRET must be set and at least 32 characters long');
+    process.exit(1);
+  }
+
+  if (!process.env.STRAVA_CLIENT_ID || !process.env.STRAVA_CLIENT_SECRET || !process.env.STRAVA_REDIRECT_URI) {
+    console.error('FATAL: STRAVA_CLIENT_ID, STRAVA_CLIENT_SECRET, and STRAVA_REDIRECT_URI must be set');
     process.exit(1);
   }
 

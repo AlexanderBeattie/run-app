@@ -60,7 +60,7 @@ import { ToastService } from '../../shared/services/toast.service';
     textarea { resize: vertical; }
     .field-error { font-size: 12px; color: #A32D2D; margin-top: -2px; }
     .pace-options, .tag-options { display: flex; gap: 8px; flex-wrap: wrap; }
-    .pace-btn, .tag-btn { border: 1px solid rgba(0,0,0,0.12); background: #fff; border-radius: 999px; padding: 8px 12px; font-size: 12px; font-weight: 500; cursor: pointer; font-family: inherit; color: #6B6B68; white-space: nowrap; }
+    .pace-btn, .tag-btn { border: 1px solid rgba(0,0,0,0.12); background: #fff; border-radius: 999px; padding: 8px 12px; font-size: 12px; font-weight: 500; cursor: pointer; font-family: inherit; color: #6B6B68; white-space: nowrap; text-transform: capitalize; }
     .pace-btn.active, .tag-btn.active { background: #1D9E75; color: #E1F5EE; border-color: #1D9E75; }
     .error { background: #FCEBEB; color: #A32D2D; border-radius: 10px; padding: 12px; font-size: 14px; }
     .submit { background: #1D9E75; color: #E1F5EE; border: none; border-radius: 12px; padding: 16px; font-size: 16px; font-weight: 500; cursor: pointer; font-family: inherit; width: 100%; }
@@ -73,7 +73,7 @@ export class CreateClubComponent {
     toast = inject(ToastService);
     name = ''; description = ''; city = ''; pace = ''; tags: string[] = [];
     error = ''; loading = false; nameTouched = false;
-    paceOptions = ['Easy', 'Moderate', 'Fast', 'Mixed'];
+    paceOptions = ['social', 'easy', 'moderate', 'fast', 'tempo'];
     tagOptions = ['Road', 'Trail', 'Social', 'Intervals', 'Beginner', 'Long distance'];
 
     toggleTag(t: string) {

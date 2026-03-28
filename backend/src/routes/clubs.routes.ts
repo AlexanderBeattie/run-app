@@ -78,7 +78,8 @@ router.get('/:id', async (req: Request, res: Response) => {
     const result = await pool.query(`
       SELECT c.*,
         (SELECT COUNT(*) FROM club_members cm WHERE cm.club_id = c.id)::int AS member_count,
-        (SELECT COUNT(*) FROM run_events r WHERE r.club_id = c.id AND r.status = 'active')::int AS active_run_count
+        (SELECT COUNT(*) FROM run_events r WHERE r.club_id = c.id AND r.status = 'active')::int AS active_run_count,
+        (SELECT COUNT(*) FROM run_events r WHERE r.club_id = c.id)::int AS total_runs_count
       FROM clubs c WHERE c.id = $1
     `, [req.params.id]);
     if (!result.rows.length) { res.status(404).json({ error: 'Not found' }); return; }

@@ -9,6 +9,7 @@ import { RunsService } from '../../../core/services/runs.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { GeocodingService } from '../../../core/services/geocoding.service';
 import { ClubService } from '../../../core/services/club.service';
+import { Router } from '@angular/router';
 
 const mockClubs = [{ id: 'club-1', name: 'Test Club' }];
 const mockCoords = { lat: 51.5, lng: -0.1 };
@@ -113,6 +114,9 @@ describe('CreateRunComponent', () => {
   });
 
   it('calls createRun with correct payload on success', async () => {
+    const router = TestBed.inject(Router);
+    jest.spyOn(router, 'navigate');
+
     component.title = 'Morning Run';
     component.startAddress = 'Victoria Park';
     component.endAddress = 'Canary Wharf';
@@ -130,6 +134,7 @@ describe('CreateRunComponent', () => {
       startLocation: mockCoords,
       endLocation: mockCoords
     }));
+    expect(router.navigate).toHaveBeenCalledWith(['/profile']);
   });
 
   it('shows error when createRun fails', async () => {

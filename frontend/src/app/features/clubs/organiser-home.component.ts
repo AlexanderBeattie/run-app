@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, ChangeDetectorRef, signal } from '@angular/core';
+import { Component, inject, OnInit, ChangeDetectorRef, signal, Input } from '@angular/core';
 import { RouterLink, Router } from '@angular/router';
 import { RunsService } from '../../core/services/runs.service';
 import { AuthService } from '../../core/services/auth.service';
@@ -11,7 +11,8 @@ import { ConfirmModalComponent } from '../../shared/components/confirm-modal/con
   standalone: true,
   imports: [RouterLink, RunOrganiserDialogComponent, ConfirmModalComponent],
   template: `
-    <div class="page" (click)="menuOpen && closeMenu($event)">
+    <div class="page" [class.embedded]="embedded" (click)="menuOpen && closeMenu($event)">
+      @if (!embedded) {
       <div class="header">
         <div class="header-top">
           <div>
@@ -57,6 +58,7 @@ import { ConfirmModalComponent } from '../../shared/components/confirm-modal/con
           </div>
         }
       </div>
+      } <!-- /if !embedded -->
 
       <div class="content">
         @if (errorMessage()) {
@@ -141,6 +143,7 @@ import { ConfirmModalComponent } from '../../shared/components/confirm-modal/con
   `,
   styles: [`
     .page { background: #0D0D0D; min-height: 100%; }
+    .page.embedded { background: transparent; }
     .header { padding: 16px 20px 20px; }
     .header-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; }
     .greeting { font-size: 12px; color: rgba(255,255,255,0.5); margin-bottom: 2px; }
@@ -214,6 +217,7 @@ import { ConfirmModalComponent } from '../../shared/components/confirm-modal/con
   `]
 })
 export class OrganiserHomeComponent implements OnInit {
+  @Input() embedded = false;
   svc = inject(RunsService);
   auth = inject(AuthService);
   router = inject(Router);
@@ -278,7 +282,7 @@ export class OrganiserHomeComponent implements OnInit {
 
   formatTime(date: string) { return new Date(date).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }); }
 
-  openDialog(run: any) { this.selectedRun = run; this.cdr.markForCheck(); }
+  openDialog(run: any) { this.selectedRun = this.svc.mapRun(run); this.cdr.markForCheck(); }
 
   cancel(id: string) {
     this.confirmModal = {

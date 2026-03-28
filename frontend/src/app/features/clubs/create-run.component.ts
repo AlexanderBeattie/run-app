@@ -99,6 +99,36 @@ import { Club } from '../../core/models/run-event.model';
         </div>
 
         <div class="field">
+          <label>Pace <span class="optional">(optional)</span></label>
+          <div class="type-pills">
+            @for (p of paceOptions; track p.value) {
+              <button type="button" class="type-pill"
+                [class.active]="pace === p.value"
+                [attr.aria-label]="p.label + ': ' + p.effort"
+                (click)="pace = pace === p.value ? null : p.value">
+                {{ p.label }} <span class="pill-effort">· {{ p.effort }}</span>
+              </button>
+            }
+          </div>
+          @if (paceHintLabel) {
+            <p class="pace-hint">{{ paceHintLabel }}</p>
+          }
+        </div>
+
+        <div class="field">
+          <label>Tags <span class="optional">(optional)</span></label>
+          <div class="type-pills">
+            @for (t of tagOptions; track t) {
+              <button type="button" class="type-pill"
+                [class.active]="tags.includes(t)"
+                (click)="toggleTag(t)">
+                {{ t }}
+              </button>
+            }
+          </div>
+        </div>
+
+        <div class="field">
           <label>Notes</label>
           <textarea [(ngModel)]="notes" rows="3" placeholder="Pace, meeting point..."></textarea>
         </div>
@@ -158,8 +188,10 @@ import { Club } from '../../core/models/run-event.model';
       transition: background 0.12s, border-color 0.12s, color 0.12s;
     }
     .type-pill.active { background: #1D9E75; border-color: #1D9E75; color: #fff; }
+    .pill-effort { font-size: 11px; opacity: 0.7; }
     .submit { background: #1D9E75; color: #E1F5EE; border: none; border-radius: 12px; padding: 16px; font-size: 16px; font-weight: 500; cursor: pointer; font-family: inherit; width: 100%; }
     .submit:disabled { opacity: 0.6; }
+    .pace-hint { font-size: 12px; color: #6B6B68; margin-top: -2px; font-style: italic; }
   `]
 })
 export class CreateRunComponent implements OnInit {
@@ -180,8 +212,34 @@ export class CreateRunComponent implements OnInit {
   maxAttendees?: number;
   notes = '';
   runType: string | null = null;
+  pace: string | null = null;
+  tags: string[] = [];
   error = '';
   loading = false;
+
+  readonly paceOptions = [
+    { value: 'social',   label: 'Social',   effort: 'chatty pace' },
+    { value: 'easy',     label: 'Easy',     effort: 'relaxed pace' },
+    { value: 'moderate', label: 'Moderate', effort: 'steady effort' },
+    { value: 'fast',     label: 'Fast',     effort: 'push pace' },
+    { value: 'tempo',    label: 'Tempo',    effort: 'race effort' },
+  ];
+
+  readonly paceMinPerKmLookup: Record<string, number> = {
+    social: 7, easy: 6.5, moderate: 6, fast: 5, tempo: 4.5
+  };
+
+  readonly tagOptions = [
+    'beginner-friendly', 'social', 'scenic', 'trail', 'hills',
+    'flat', 'evening', 'morning', 'dog-friendly', 'timed',
+    'point-to-point', 'muddy', 'pub-after', 'medal', 'structured',
+  ];
+
+  toggleTag(tag: string) {
+    this.tags = this.tags.includes(tag)
+      ? this.tags.filter(t => t !== tag)
+      : [...this.tags, tag];
+  }
 
   readonly runTypes = [
     { value: 'club_run',       label: 'Club Run',   emoji: '🏃' },
@@ -196,6 +254,23 @@ export class CreateRunComponent implements OnInit {
     const h = Math.floor(this.estimatedMinutes / 60);
     const m = this.estimatedMinutes % 60;
     return h > 0 ? `${h}h ${m}m` : `${m}m`;
+  }
+
+  get paceMinPerKm(): number {
+    return this.pace ? (this.paceMinPerKmLookup[this.pace] ?? 6) : 6;
+  }
+
+  get paceHintLabel(): string {
+    if (!this.pace) return '';
+    const option = this.paceOptions.find(p => p.value === this.pace);
+    const label = option?.label ?? this.pace;
+    const minPerKm = this.paceMinPerKm;
+    if (this.distanceKm <= 0) return `${label} pace · ~${minPerKm} min/km`;
+    const estMins = Math.round(this.distanceKm * minPerKm);
+    const h = Math.floor(estMins / 60);
+    const m = estMins % 60;
+    const estLabel = h > 0 ? `${h}h ${m}m` : `${m}m`;
+    return `${label} pace · ~${minPerKm} min/km · Est. ${estLabel}`;
   }
 
   private haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
@@ -255,7 +330,7 @@ export class CreateRunComponent implements OnInit {
 
     const rawKm = this.haversineKm(sl.lat, sl.lng, el.lat, el.lng);
     this.distanceKm = Math.round(rawKm * 10) / 10;
-    this.estimatedMinutes = Math.round(this.distanceKm * 6);
+    this.estimatedMinutes = Math.round(this.distanceKm * this.paceMinPerKm);
 
     this.runsService.createRun({
       clubId: this.selectedClubId,
@@ -270,9 +345,11 @@ export class CreateRunComponent implements OnInit {
       estimatedMinutes: this.estimatedMinutes,
       maxAttendees: this.maxAttendees,
       notes: this.notes,
+      pace: this.pace ?? undefined,
+      tags: this.tags.length ? this.tags : undefined,
       runType: this.runType ?? undefined
     }).subscribe({
-      next: () => { this.toast.show('Run posted!'); this.router.navigate(['/organiser']); },
+      next: () => { this.toast.show('Run posted!'); this.router.navigate(['/profile']); },
       error: () => {
         this.error = 'Failed to post run.';
         this.loading = false;
