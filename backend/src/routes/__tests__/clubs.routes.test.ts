@@ -224,6 +224,37 @@ describe('PATCH /api/clubs/:id', () => {
     expect(res.status).toBe(200);
     expect(res.body.name).toBe('Updated Club');
   });
+
+  it('updates all optional fields when all are provided', async () => {
+    mockPool
+      .mockResolvedValueOnce({ rows: [{ owner_id: 'user-123' }] })
+      .mockResolvedValueOnce({ rows: [{ ...mockClub, name: 'New', description: 'Desc', city: 'NYC', pace: 'fast', tags: ['trail'] }] });
+    const res = await request(app)
+      .patch('/api/clubs/club-1')
+      .set('Authorization', `Bearer ${validToken}`)
+      .send({ name: 'New', description: 'Desc', city: 'NYC', pace: 'fast', tags: ['trail'] });
+    expect(res.status).toBe(200);
+  });
+
+  it('updates club with only description (name is absent — covers ?? null right branch)', async () => {
+    mockPool
+      .mockResolvedValueOnce({ rows: [{ owner_id: 'user-123' }] })
+      .mockResolvedValueOnce({ rows: [{ ...mockClub, description: 'New desc' }] });
+    const res = await request(app)
+      .patch('/api/clubs/club-1')
+      .set('Authorization', `Bearer ${validToken}`)
+      .send({ description: 'New desc' });
+    expect(res.status).toBe(200);
+  });
+
+  it('returns 500 on database error', async () => {
+    mockPool.mockRejectedValueOnce(new Error('DB error'));
+    const res = await request(app)
+      .patch('/api/clubs/club-1')
+      .set('Authorization', `Bearer ${validToken}`)
+      .send({ name: 'Updated' });
+    expect(res.status).toBe(500);
+  });
 });
 
 // ─── GET /api/clubs/:id/runs ──────────────────────────────────────────────────
@@ -333,5 +364,13 @@ describe('POST /api/clubs/:id/join', () => {
       .set('Authorization', `Bearer ${validToken}`);
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/owner cannot leave/i);
+  });
+
+  it('returns 500 on database error', async () => {
+    mockPool.mockRejectedValueOnce(new Error('DB error'));
+    const res = await request(app)
+      .post('/api/clubs/club-1/join')
+      .set('Authorization', `Bearer ${validToken}`);
+    expect(res.status).toBe(500);
   });
 });

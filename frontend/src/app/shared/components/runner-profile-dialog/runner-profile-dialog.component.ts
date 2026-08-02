@@ -35,7 +35,7 @@ type RunnerProfile = {
             <button class="dismiss-btn" (click)="close.emit()">Dismiss</button>
           </div>
         } @else if (profile()) {
-          <div class="av">{{ profile()!.display_name?.[0]?.toUpperCase() ?? '?' }}</div>
+          <div class="av">{{ profile()!.display_name.charAt(0).toUpperCase() || '?' }}</div>
           <div class="name">{{ profile()!.display_name }}</div>
           <div class="stats-row">
             <div class="stat">
@@ -76,7 +76,7 @@ type RunnerProfile = {
               }
             </ul>
           } @else {
-            <p class="no-runs">No runs yet — early days!</p>
+            <p class="no-runs">No runs yet. Early days!</p>
           }
         }
       </div>
@@ -93,16 +93,16 @@ type RunnerProfile = {
     .stat { flex: 1; padding: 12px 8px; border-right: 0.5px solid rgba(0,0,0,0.08); }
     .stat:last-child { border-right: none; }
     .sv { font-size: 17px; font-weight: 600; color: #0D0D0D; text-transform: capitalize; }
-    .sl { font-size: 10px; color: #9B9B98; margin-top: 2px; }
+    .sl { font-size: 10px; color: #6B6B68; margin-top: 2px; }
     .verified-label { display: flex; align-items: center; justify-content: center; gap: 3px; color: #FC4C02; }
     .strava-icon { width: 10px; height: 10px; flex-shrink: 0; }
     .run-strava-icon { width: 11px; height: 11px; flex-shrink: 0; vertical-align: middle; margin-right: 3px; }
-    .section-title { font-size: 11px; font-weight: 500; color: #9B9B98; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; text-align: left; }
+    .section-title { font-size: 11px; font-weight: 500; color: #6B6B68; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; text-align: left; }
     .recent-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
     .recent-item { display: flex; flex-direction: column; background: #F7F7F5; border-radius: 10px; padding: 8px 12px; text-align: left; }
     .recent-title { font-size: 13px; font-weight: 500; color: #0D0D0D; }
-    .recent-meta { font-size: 11px; color: #9B9B98; margin-top: 2px; }
-    .no-runs { font-size: 13px; color: #9B9B98; margin: 0; }
+    .recent-meta { font-size: 11px; color: #6B6B68; margin-top: 2px; }
+    .no-runs { font-size: 13px; color: #6B6B68; margin: 0; }
     .error-state { padding: 16px 0; display: flex; flex-direction: column; align-items: center; gap: 12px; }
     .error-icon { width: 40px; height: 40px; border-radius: 50%; background: #FEE2E2; color: #7f1d1d; font-size: 20px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
     .error-state p { font-size: 14px; color: #3D3D3B; margin: 0; }
@@ -116,7 +116,7 @@ type RunnerProfile = {
     @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
     @media (max-width: 400px) {
       .overlay { padding: 12px 0 0; align-items: flex-end; }
-      .card { max-width: 100%; border-radius: 20px 20px 0 0; }
+      .card { max-width: 100%; border-radius: var(--radius-sheet, 24px) var(--radius-sheet, 24px) 0 0; }
     }
   `]
 })

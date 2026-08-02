@@ -1,7 +1,24 @@
+PREFERENCE: Always prioritize local rules in ./.claude/rules/ and specialists in ./.claude/agents/.
+
 # Project: KLUB — Run Club Discovery Platform
 
 **Stack:** Angular 17 (standalone) · Node/Express · PostgreSQL
 **Phase:** Phase 4 — Deployment Readiness (see `tasks/todo.md`)
+
+---
+
+## Armoury Link
+
+Local specialists are loaded from `.claude/agents/` — these override global agent definitions for this project.
+
+| Specialist | File | Role |
+| :--- | :--- | :--- |
+| `typescript-reviewer` | `.claude/agents/typescript-reviewer.md` | Angular/UI + Node/API review |
+| `architect` | `.claude/agents/architect.md` | System design, ADRs, cross-cutting decisions |
+| `code-reviewer` | `.claude/agents/code-reviewer.md` | General code quality + PRs |
+| `security-reviewer` | `.claude/agents/security-reviewer.md` | Auth, API, input validation |
+
+Armoury source: `/Users/alexbeattie/development/AI-Armoury/02-Specialists/`
 
 ---
 

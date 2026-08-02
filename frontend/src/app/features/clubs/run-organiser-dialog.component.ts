@@ -44,7 +44,7 @@ declare const google: any;
           <div class="attendee-list">
             @for (a of attendees; track a.id) {
               <div class="attendee-row">
-                <div class="av">{{ a.display_name?.[0]?.toUpperCase() || '?' }}</div>
+                <div class="av">{{ a.display_name.charAt(0).toUpperCase() || '?' }}</div>
                 <span class="aname">{{ a.display_name }}</span>
                 <span class="adate">{{ formatJoinDate(a.joined_at) }}</span>
               </div>
@@ -73,7 +73,7 @@ declare const google: any;
   `,
   styles: [`
     .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: flex-end; justify-content: center; z-index: 500; }
-    .dialog { background: #fff; border-radius: 20px 20px 0 0; width: 100%; max-width: 560px; max-height: 92dvh; overflow-y: auto; padding: 8px 20px 40px; }
+    .dialog { background: #fff; border-radius: var(--radius-sheet, 24px) var(--radius-sheet, 24px) 0 0; width: 100%; max-width: 560px; max-height: 92dvh; overflow-y: auto; padding: 8px 20px 40px; }
     .drag-handle { width: 40px; height: 4px; background: rgba(0,0,0,0.15); border-radius: 2px; margin: 8px auto 16px; }
     .close { position: absolute; margin-top: -44px; float: right; background: #F7F7F5; border: none; width: 30px; height: 30px; border-radius: 50%; font-size: 14px; cursor: pointer; color: #6B6B68; }
     .header-row { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; flex-wrap: wrap; }
@@ -90,19 +90,19 @@ declare const google: any;
     .dot.black { background: #0D0D0D; }
     .capacity-card { background: #F7F7F5; border-radius: 12px; padding: 14px; margin-bottom: 20px; }
     .cap-row { display: flex; justify-content: space-between; margin-bottom: 6px; }
-    .cap-label { font-size: 12px; color: #9B9B98; }
+    .cap-label { font-size: 12px; color: #6B6B68; }
     .cap-val { font-size: 13px; font-weight: 500; color: #0D0D0D; }
     .cap-bar { height: 6px; background: rgba(0,0,0,0.08); border-radius: 999px; overflow: hidden; margin-bottom: 6px; }
     .cap-fill { height: 100%; background: #1D9E75; border-radius: 999px; }
     .cap-sub { font-size: 12px; color: #6B6B68; }
-    .section-title { font-size: 12px; font-weight: 500; color: #9B9B98; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 10px; }
-    .empty { font-size: 13px; color: #9B9B98; margin-bottom: 16px; }
+    .section-title { font-size: 12px; font-weight: 500; color: #6B6B68; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 10px; }
+    .empty { font-size: 13px; color: #6B6B68; margin-bottom: 16px; }
     .attendee-list { display: flex; flex-direction: column; margin-bottom: 20px; }
     .attendee-row { display: flex; align-items: center; gap: 10px; padding: 8px 6px; border-radius: 8px; }
     .attendee-row:hover { background: #F7F7F5; }
     .av { width: 28px; height: 28px; border-radius: 50%; background: #E1F5EE; color: #0F6E56; font-size: 12px; font-weight: 500; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
     .aname { font-size: 14px; color: #0D0D0D; flex: 1; }
-    .adate { font-size: 12px; color: #9B9B98; }
+    .adate { font-size: 12px; color: #6B6B68; }
     .actions { display: flex; gap: 8px; flex-wrap: wrap; }
     .btn-sm { background: transparent; border: 0.5px solid rgba(0,0,0,0.15); border-radius: 8px; padding: 10px 16px; font-size: 13px; cursor: pointer; font-family: inherit; color: #6B6B68; text-decoration: none; }
     .btn-sm.warn { color: #BA7517; border-color: #BA7517; }

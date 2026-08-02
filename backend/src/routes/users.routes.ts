@@ -2,6 +2,65 @@ import { Router, Request, Response } from 'express';
 import { pool } from '../db';
 import { requireAuth } from '../middleware/auth.middleware';
 import { AuthRequest } from '../types/index';
+import { encrypt, decrypt } from '../utils/crypto.util';
+
+interface StravaRefreshResponse {
+  access_token: string;
+  refresh_token: string;
+  expires_at: number;
+}
+
+async function ensureFreshStravaToken(userId: string): Promise<string> {
+  const result = await pool.query(
+    'SELECT strava_access_token, strava_refresh_token, strava_token_expires_at FROM users WHERE id = $1',
+    [userId]
+  );
+
+  if (!result.rows.length || !result.rows[0].strava_access_token) {
+    throw new Error('Strava not connected');
+  }
+
+  const { strava_access_token, strava_refresh_token, strava_token_expires_at } = result.rows[0];
+
+  // Refresh if token expires within the next 5 minutes
+  const expiresAt = Number(strava_token_expires_at);
+  if (expiresAt > Math.floor(Date.now() / 1000) + 300) {
+    return decrypt(strava_access_token);
+  }
+
+  const refreshRes = await fetch('https://www.strava.com/oauth/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      client_id: process.env.STRAVA_CLIENT_ID,
+      client_secret: process.env.STRAVA_CLIENT_SECRET,
+      grant_type: 'refresh_token',
+      refresh_token: decrypt(strava_refresh_token),
+    }),
+  });
+
+  if (!refreshRes.ok) {
+    throw new Error('Strava token refresh failed');
+  }
+
+  const refreshData = await refreshRes.json() as StravaRefreshResponse;
+
+  await pool.query(
+    `UPDATE users SET
+       strava_access_token     = $1,
+       strava_refresh_token    = $2,
+       strava_token_expires_at = $3
+     WHERE id = $4`,
+    [
+      encrypt(refreshData.access_token),
+      encrypt(refreshData.refresh_token),
+      refreshData.expires_at,
+      userId,
+    ]
+  );
+
+  return refreshData.access_token;
+}
 
 const router = Router();
 
@@ -61,22 +120,26 @@ router.get('/:id/profile', async (req: Request, res: Response) => {
 router.get('/strava/activities', requireAuth, async (req: AuthRequest, res: Response) => {
   const userId = req.user!.id;
   try {
-    const userResult = await pool.query(
-      'SELECT strava_access_token FROM users WHERE id = $1',
-      [userId]
-    );
-
-    if (!userResult.rows.length || !userResult.rows[0].strava_access_token) {
-      res.status(403).json({ error: 'Strava not connected' });
-      return;
+    let accessToken: string;
+    try {
+      accessToken = await ensureFreshStravaToken(userId);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Strava error';
+      if (message === 'Strava not connected') {
+        res.status(403).json({ error: 'Strava not connected' });
+        return;
+      }
+      if (message === 'Strava token refresh failed') {
+        res.status(401).json({ error: 'Strava token could not be refreshed. Please reconnect Strava.' });
+        return;
+      }
+      throw err;
     }
-
-    const { strava_access_token } = userResult.rows[0];
 
     let apiRes: globalThis.Response;
     try {
       apiRes = await fetch('https://www.strava.com/api/v3/athlete/activities?per_page=10', {
-        headers: { Authorization: `Bearer ${strava_access_token}` },
+        headers: { Authorization: `Bearer ${accessToken}` },
       });
     } catch (err) {
       console.error('Strava API unreachable:', err);
@@ -86,7 +149,7 @@ router.get('/strava/activities', requireAuth, async (req: AuthRequest, res: Resp
 
     if (!apiRes.ok) {
       if (apiRes.status === 401) {
-        res.status(401).json({ error: 'Strava token expired. Please reconnect Strava.' });
+        res.status(401).json({ error: 'Strava token expired or invalid. Please reconnect Strava.' });
         return;
       }
       if (apiRes.status === 429) {

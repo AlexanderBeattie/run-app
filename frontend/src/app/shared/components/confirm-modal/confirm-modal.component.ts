@@ -5,7 +5,8 @@ import { Component, Input, Output, EventEmitter, inject, OnInit, ChangeDetectorR
   standalone: true,
   template: `
     <div class="overlay" (click)="onBackdropClick()">
-      <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal" role="dialog" aria-modal="true" (click)="$event.stopPropagation()">
+        <div class="sheet-handle" aria-hidden="true"></div>
         <div class="modal-content">
           <h2 class="modal-title">{{ title }}</h2>
           <p class="modal-message">{{ message }}</p>
@@ -21,7 +22,7 @@ import { Component, Input, Output, EventEmitter, inject, OnInit, ChangeDetectorR
     .overlay {
       position: fixed;
       inset: 0;
-      background: rgba(0, 0, 0, 0.5);
+      background: rgba(13, 13, 12, 0.45);
       display: flex;
       align-items: flex-end;
       justify-content: center;
@@ -36,11 +37,18 @@ import { Component, Input, Output, EventEmitter, inject, OnInit, ChangeDetectorR
 
     .modal {
       background: #fff;
-      border-radius: 20px 20px 0 0;
+      border-radius: var(--radius-sheet, 24px) var(--radius-sheet, 24px) 0 0;
       width: 100%;
       max-width: 560px;
-      padding: 24px 20px;
-      animation: slideUp 0.3s ease;
+      padding: 10px 20px calc(24px + env(safe-area-inset-bottom));
+      box-shadow: var(--shadow-overlay, 0 8px 32px rgba(13,13,12,0.16));
+      animation: slideUp 0.35s var(--ease-out, ease);
+    }
+
+    .sheet-handle {
+      width: 36px; height: 4px; border-radius: 999px;
+      background: rgba(13, 13, 12, 0.15);
+      margin: 0 auto 14px;
     }
 
     @keyframes slideUp {
@@ -77,14 +85,20 @@ import { Component, Input, Output, EventEmitter, inject, OnInit, ChangeDetectorR
     .btn-cancel,
     .btn-confirm {
       flex: 1;
+      min-height: 48px;
       padding: 12px 16px;
       border: none;
-      border-radius: 10px;
+      border-radius: var(--radius-button, 12px);
       font-size: 15px;
       font-weight: 600;
       font-family: inherit;
       cursor: pointer;
-      transition: opacity 0.2s;
+      transition: opacity 0.2s, transform 0.15s var(--ease-out, ease-out);
+    }
+
+    .btn-cancel:active,
+    .btn-confirm:active {
+      transform: scale(0.98);
     }
 
     .btn-cancel {
@@ -93,17 +107,9 @@ import { Component, Input, Output, EventEmitter, inject, OnInit, ChangeDetectorR
       border: 0.5px solid rgba(0, 0, 0, 0.12);
     }
 
-    .btn-cancel:active {
-      opacity: 0.8;
-    }
-
     .btn-confirm {
-      background: #1D9E75;
-      color: #E1F5EE;
-    }
-
-    .btn-confirm:active {
-      opacity: 0.9;
+      background: var(--klub-green-dark, #0F6E56);
+      color: #fff;
     }
 
     .btn-confirm.destructive {
@@ -118,7 +124,12 @@ import { Component, Input, Output, EventEmitter, inject, OnInit, ChangeDetectorR
       }
 
       .modal {
-        border-radius: 20px;
+        border-radius: var(--radius-sheet, 24px);
+        padding-bottom: 24px;
+      }
+
+      .sheet-handle {
+        display: none;
       }
     }
   `]

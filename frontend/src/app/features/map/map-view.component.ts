@@ -1,8 +1,10 @@
 import { Component, inject, ViewChild, ElementRef, AfterViewInit, OnInit, signal } from '@angular/core';
+import { CommonModule } from '@angular/common';
 import { RunsService } from '../../core/services/runs.service';
 import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../shared/services/toast.service';
 import { RunDetailDialogComponent } from '../../shared/components/run-detail-dialog/run-detail-dialog.component';
+import { RunCardCarouselComponent } from '../../shared/components/run-card-carousel/run-card-carousel.component';
 import { RunEvent } from '../../core/models/run-event.model';
 import { RouterLink } from '@angular/router';
 import { environment } from '../../../environments/environment';
@@ -15,7 +17,7 @@ const LOCATION_KEY = 'klub_last_location';
 @Component({
   selector: 'app-map-view',
   standalone: true,
-  imports: [RunDetailDialogComponent, RouterLink],
+  imports: [CommonModule, RunDetailDialogComponent, RunCardCarouselComponent, RouterLink],
   template: `
     <div class="map-wrap">
       <div #mapEl class="map-el"></div>
@@ -39,27 +41,16 @@ const LOCATION_KEY = 'klub_last_location';
         </svg>
       </button>
 
-      <div class="sheet" [class.expanded]="sheetOpen()">
-        <div class="sheet-handle" (click)="sheetOpen.set(!sheetOpen())">
-          <div class="handle-bar"></div>
-          <span>{{ sheetOpen() ? 'Nearby runs' : 'View ' + runsService.getRuns()().length + ' runs' }}</span>
+      @if (runsService.getRuns()().length > 0) {
+        <div class="carousel-dock">
+          <app-run-card-carousel
+            [runs]="runsService.getRuns()()"
+            [selectedRunId]="selectedCarouselId()"
+            (cardTapped)="onCarouselTap($event)"
+            (scrollFocused)="onCarouselScroll($event)"
+          />
         </div>
-        <div class="sheet-list">
-          @for (run of runsService.getRuns()(); track run.id) {
-            <div class="sheet-item" (click)="openDialog(run)">
-              <div class="item-left">
-                <div class="item-club">{{ run.clubName }}</div>
-                <div class="item-title">{{ run.title }}</div>
-                <div class="item-meta">{{ runsService.formatDate(run.date) }} · {{ run.distanceKm }}k</div>
-              </div>
-              <div class="item-right">
-                <div class="item-going">{{ run.attendees.length }}</div>
-                <div class="item-going-label">going</div>
-              </div>
-            </div>
-          }
-        </div>
-      </div>
+      }
     </div>
 
     @if (dialogRun()) {
@@ -76,22 +67,24 @@ const LOCATION_KEY = 'klub_last_location';
     .map-header { position: absolute; top: 0; left: 0; right: 0; padding: 16px 16px 12px; background: linear-gradient(to bottom, rgba(13,13,13,0.8), transparent); pointer-events: none; }
     .map-title { font-size: 18px; font-weight: 700; letter-spacing: 0.18em; color: #1D9E75; }
     .runs-count { font-size: 12px; color: rgba(255,255,255,0.6); margin-top: 2px; }
-    .fab { position: absolute; bottom: 220px; right: 16px; width: 52px; height: 52px; border-radius: 50%; background: #1D9E75; display: flex; align-items: center; justify-content: center; text-decoration: none; z-index: 10; }
-    .locate-btn { position: absolute; bottom: 220px; left: 16px; width: 44px; height: 44px; border-radius: 50%; background: #fff; border: none; box-shadow: 0 2px 8px rgba(0,0,0,0.15); display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 10; color: #0D0D0D; }
-    .sheet { position: absolute; bottom: 0; left: 0; right: 0; background: #fff; border-radius: 20px 20px 0 0; max-height: 70%; transition: transform 0.3s ease; transform: translateY(calc(100% - 72px)); z-index: 10; display: flex; flex-direction: column; }
-    .sheet.expanded { transform: translateY(0); }
-    .sheet-handle { padding: 10px 16px 8px; display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: pointer; flex-shrink: 0; }
-    .handle-bar { width: 40px; height: 4px; background: rgba(0,0,0,0.15); border-radius: 2px; }
-    .sheet-handle span { font-size: 13px; font-weight: 500; color: #0D0D0D; }
-    .sheet-list { overflow-y: auto; padding: 0 16px 24px; display: flex; flex-direction: column; gap: 2px; }
-    .sheet-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 10px; border-radius: 10px; cursor: pointer; }
-    .sheet-item:hover { background: #F7F7F5; }
-    .item-club { font-size: 11px; color: #1D9E75; font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 2px; }
-    .item-title { font-size: 14px; font-weight: 500; color: #0D0D0D; margin-bottom: 2px; }
-    .item-meta { font-size: 12px; color: #6B6B68; }
-    .item-right { text-align: center; flex-shrink: 0; margin-left: 12px; }
-    .item-going { font-size: 18px; font-weight: 500; color: #0D0D0D; }
-    .item-going-label { font-size: 10px; color: #9B9B98; }
+    .fab { position: absolute; bottom: 196px; right: 16px; width: 52px; height: 52px; border-radius: 50%; background: #1D9E75; display: flex; align-items: center; justify-content: center; text-decoration: none; z-index: 10; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+    .locate-btn { position: absolute; bottom: 196px; left: 16px; width: 44px; height: 44px; border-radius: 50%; background: #fff; border: none; box-shadow: 0 2px 8px rgba(0,0,0,0.15); display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 10; color: #0D0D0D; }
+    .carousel-dock {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 20%;
+      min-height: 148px;
+      background: linear-gradient(to top, rgba(10,10,26,0.95) 60%, transparent);
+      display: flex;
+      align-items: flex-end;
+      padding-bottom: 8px;
+      z-index: 10;
+    }
+    .carousel-dock app-run-card-carousel {
+      width: 100%;
+    }
   `]
 })
 export class MapViewComponent implements OnInit, AfterViewInit {
@@ -101,7 +94,7 @@ export class MapViewComponent implements OnInit, AfterViewInit {
   toast = inject(ToastService);
   map: any;
   userMarker: any;
-  sheetOpen = signal(false);
+  selectedCarouselId = signal<string | null>(null);
   dialogRun = signal<RunEvent | null>(null);
 
   private getStoredLocation(): { lat: number; lng: number } {
@@ -112,21 +105,23 @@ export class MapViewComponent implements OnInit, AfterViewInit {
     return GLASGOW_DEFAULT;
   }
 
-  private storeLocation(coords: { lat: number; lng: number }) {
+  private storeLocation(coords: { lat: number; lng: number }): void {
     localStorage.setItem(LOCATION_KEY, JSON.stringify(coords));
   }
 
-  ngOnInit() { this.runsService.loadRuns(); }
+  ngOnInit(): void { this.runsService.loadRuns(); }
 
-  ngAfterViewInit() {
+  ngAfterViewInit(): void {
     if (typeof google !== 'undefined') { this.initMap(); return; }
     const s = document.createElement('script');
     s.src = `https://maps.googleapis.com/maps/api/js?key=${environment.googleMapsApiKey}&libraries=marker`;
+    s.async = true;
+    s.defer = true;
     s.onload = () => this.initMap();
     document.head.appendChild(s);
   }
 
-  initMap() {
+  initMap(): void {
     const startLocation = this.getStoredLocation();
     this.map = new google.maps.Map(this.mapEl.nativeElement, {
       center: startLocation, zoom: 13,
@@ -139,7 +134,7 @@ export class MapViewComponent implements OnInit, AfterViewInit {
     this.locateUser();
   }
 
-  addRunMarkers() {
+  addRunMarkers(): void {
     this.runsService.getRuns()().forEach(run => {
       const pin = new google.maps.marker.PinElement({
         background: '#1D9E75', borderColor: '#0F6E56', glyphColor: '#fff', scale: 0.9
@@ -147,11 +142,32 @@ export class MapViewComponent implements OnInit, AfterViewInit {
       const m = new google.maps.marker.AdvancedMarkerElement({
         position: run.startLocation, map: this.map, title: run.clubName, content: pin
       });
-      m.addListener('click', () => this.dialogRun.set(run));
+      m.addListener('gmp-click', () => {
+        this.selectedCarouselId.set(run.id);
+        this.panToWithOffset(run.startLocation);
+      });
     });
   }
 
-  locateUser() {
+  onCarouselTap(runId: string): void {
+    const run = this.runsService.getRuns()().find(r => r.id === runId);
+    if (run) {
+      this.selectedCarouselId.set(runId);
+      this.dialogRun.set(run);
+    }
+  }
+
+  onCarouselScroll(runId: string): void {
+    if (!this.map) return;
+    if (runId === this.selectedCarouselId()) return;
+    const run = this.runsService.getRuns()().find(r => r.id === runId);
+    if (run?.startLocation) {
+      this.selectedCarouselId.set(runId);
+      this.panToWithOffset(run.startLocation);
+    }
+  }
+
+  locateUser(): void {
     if (!navigator.geolocation) return;
     navigator.geolocation.getCurrentPosition(
       (pos) => {
@@ -161,14 +177,30 @@ export class MapViewComponent implements OnInit, AfterViewInit {
         this.map.setZoom(13);
         this.setUserMarker(coords);
       },
-      () => {
-        // Denied or error — stay on stored/default location
+      (err) => {
+        const msg = err.code === 1
+          ? 'Location blocked. Check your browser permission settings'
+          : 'Could not get your location';
+        console.warn('[KLUB] Geolocation error:', err.code, err.message);
+        this.toast.show(msg);
       },
       { enableHighAccuracy: true, timeout: 8000 }
     );
   }
 
-  private setUserMarker(coords: { lat: number; lng: number }) {
+  private panToWithOffset(location: { lat: number; lng: number }): void {
+    const projection = this.map.getProjection();
+    if (!projection) {
+      this.map.panTo(location);
+      return;
+    }
+    const point = projection.fromLatLngToPoint(new google.maps.LatLng(location.lat, location.lng));
+    const offsetPoint = new google.maps.Point(point.x, point.y - 80 / Math.pow(2, this.map.getZoom()));
+    const offsetLatLng = projection.fromPointToLatLng(offsetPoint);
+    this.map.panTo(offsetLatLng);
+  }
+
+  private setUserMarker(coords: { lat: number; lng: number }): void {
     if (this.userMarker) {
       this.userMarker.position = coords;
     } else {
@@ -176,14 +208,12 @@ export class MapViewComponent implements OnInit, AfterViewInit {
         background: '#4285F4', borderColor: '#fff', glyphColor: '#fff', scale: 0.75
       });
       this.userMarker = new google.maps.marker.AdvancedMarkerElement({
-        position: coords, map: this.map, title: 'You', content: pin,
-        zIndex: 999
+        position: coords, map: this.map, title: 'You', content: pin, zIndex: 999
       });
     }
   }
 
-  openDialog(run: RunEvent) { this.dialogRun.set(run); this.sheetOpen.set(false); }
-  onJoin(runId: string) {
+  onJoin(runId: string): void {
     const wasJoined = this.runsService.getJoinedRunIds()().includes(runId);
     this.runsService.toggleJoin(runId, this.auth.getUser()()?.id ?? 'guest');
     this.toast.show(wasJoined ? 'Left the run' : "You're in!");

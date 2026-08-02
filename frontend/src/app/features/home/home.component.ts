@@ -1,6 +1,5 @@
 import { Component, inject, OnInit, ChangeDetectorRef, signal, computed, DestroyRef, HostListener } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { RunsService } from '../../core/services/runs.service';
 import { AuthService } from '../../core/services/auth.service';
@@ -11,15 +10,27 @@ import { Coordinates } from '../../core/models/run-event.model';
 import { RunCardComponent } from '../../shared/components/run-card/run-card.component';
 import { RunDetailDialogComponent } from '../../shared/components/run-detail-dialog/run-detail-dialog.component';
 import { OnboardingComponent, OnboardingPrefs } from '../onboarding/onboarding.component';
+import { LocationWelcomeModalComponent } from '../../shared/components/location-welcome-modal/location-welcome-modal.component';
+import { FirstRunCtaBlockComponent } from '../../shared/components/first-run-cta-block/first-run-cta-block.component';
+import { GeolocationService } from '../../core/services/geolocation.service';
 import { RunEvent, Club } from '../../core/models/run-event.model';
 import { Subject, debounceTime, distinctUntilChanged } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { environment } from '../../../environments/environment';
+import { RunMiniCarouselComponent } from './run-mini-carousel.component';
+import { CategoryTilesComponent, HomeCategory } from './category-tiles.component';
+import { ClubsStripComponent } from './clubs-strip.component';
+import { FeaturedClubsComponent } from './featured-clubs.component';
+import { gradientForPace } from '../../shared/utils/run-pace';
 
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [RunCardComponent, RunDetailDialogComponent, OnboardingComponent, RouterLink, FormsModule],
+  imports: [
+    RunCardComponent, RunDetailDialogComponent, OnboardingComponent, LocationWelcomeModalComponent,
+    FirstRunCtaBlockComponent, FormsModule,
+    RunMiniCarouselComponent, CategoryTilesComponent, ClubsStripComponent, FeaturedClubsComponent,
+  ],
   template: `
     <div class="page">
 
@@ -32,7 +43,7 @@ import { environment } from '../../../environments/environment';
             </svg>
             <span class="location-label">{{ locationLabel() }}</span>
             <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-              <path d="M2.5 3.5L5 6.5L7.5 3.5" stroke="#9B9B98" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M2.5 3.5L5 6.5L7.5 3.5" stroke="#6B6B68" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
           </div>
           <div class="greeting">Good {{ timeOfDay }}, {{ firstName }}</div>
@@ -48,7 +59,7 @@ import { environment } from '../../../environments/environment';
       <!-- Search -->
       <div class="search-row">
         <div class="search-box">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9B9B98" stroke-width="2.5">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6B6B68" stroke-width="2.5">
             <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
           </svg>
           <input
@@ -91,96 +102,26 @@ import { environment } from '../../../environments/environment';
       </div>
 
       <!-- Category tiles -->
-      <div class="categories">
-        @for (cat of categories; track cat.label) {
-          <div class="cat-wrap" (click)="setCategory(cat)">
-            <div class="cat-tile" [class.cat-active]="activeCategory === cat.label" [style.background]="cat.bg">
-              <span class="cat-emoji">{{ cat.emoji }}</span>
-            </div>
-            <div class="cat-label" [class.label-active]="activeCategory === cat.label">{{ cat.label }}</div>
-          </div>
-        }
-      </div>
+      <app-category-tiles [categories]="categories" [active]="activeCategory" (select)="setCategory($event)" />
 
       <!-- Clubs carousel -->
       @if (clubs().length > 0) {
-        <div class="section-header">
-          <span class="section-title">Run Clubs</span>
-          <a class="section-link" routerLink="/clubs">See all</a>
-        </div>
-        <div class="clubs-carousel">
-          @for (club of clubs(); track club.id) {
-            <a class="club-card" [routerLink]="['/clubs', club.id]">
-              <div class="club-av" [style.background]="clubColor(club.id)">{{ club.name[0].toUpperCase() }}</div>
-              <div class="club-name">{{ club.name }}</div>
-              <div class="club-meta">{{ club.member_count }} members</div>
-            </a>
-          }
-        </div>
+        <app-clubs-strip [clubs]="clubs()" />
       }
 
       <!-- Trending carousel -->
       @if (trendingRuns().length > 0) {
-        <div class="section-header">
-          <span class="section-title">🔥 Trending</span>
-        </div>
-        <div class="h-carousel">
-          @for (run of trendingRuns(); track run.id) {
-            <div class="h-card" (click)="openDialog(run)">
-              <div class="h-banner" [style.background]="gradientForPace(run.pace)">
-                <div class="h-dist">{{ run.distanceKm }}km</div>
-                <div class="h-going">{{ run.attendees.length }} going</div>
-              </div>
-              <div class="h-body">
-                <div class="h-title">{{ run.title }}</div>
-                <div class="h-date">{{ runsService.formatDate(run.date) }}</div>
-              </div>
-            </div>
-          }
-        </div>
+        <app-run-mini-carousel title="🔥 Trending" [runs]="trendingRuns()" (runClick)="openDialog($event)" />
       }
 
       <!-- This weekend carousel -->
       @if (weekendRuns().length > 0) {
-        <div class="section-header">
-          <span class="section-title">📅 This Weekend</span>
-        </div>
-        <div class="h-carousel">
-          @for (run of weekendRuns(); track run.id) {
-            <div class="h-card" (click)="openDialog(run)">
-              <div class="h-banner" [style.background]="gradientForPace(run.pace)">
-                <div class="h-dist">{{ run.distanceKm }}km</div>
-                <div class="h-going">{{ run.attendees.length }} going</div>
-              </div>
-              <div class="h-body">
-                <div class="h-title">{{ run.title }}</div>
-                <div class="h-date">{{ runsService.formatDate(run.date) }}</div>
-              </div>
-            </div>
-          }
-        </div>
+        <app-run-mini-carousel title="📅 This Weekend" [runs]="weekendRuns()" (runClick)="openDialog($event)" />
       }
 
       <!-- Featured clubs -->
       @if (featuredClubs().length > 0) {
-        <div class="section-header">
-          <span class="section-title">Featured Clubs</span>
-          <a class="section-link" routerLink="/clubs">See all</a>
-        </div>
-        <div class="featured-clubs-row">
-          @for (club of featuredClubs(); track club.id) {
-            <a class="fc-card" [routerLink]="['/clubs', club.id]">
-              <div class="fc-av" [style.background]="clubColor(club.id)">{{ club.name[0].toUpperCase() }}</div>
-              <div class="fc-info">
-                <div class="fc-name">{{ club.name }}</div>
-                <div class="fc-meta">{{ club.member_count }} members</div>
-                @if (club.pace) {
-                  <span class="fc-pace">{{ club.pace }}</span>
-                }
-              </div>
-            </a>
-          }
-        </div>
+        <app-featured-clubs [clubs]="featuredClubs()" />
       }
 
       <!-- Error message -->
@@ -258,6 +199,13 @@ import { environment } from '../../../environments/environment';
       </div>
 
       <div class="feed-surface">
+        @if (showFirstRunCta()) {
+          <app-first-run-cta-block
+            [runs]="nearbyRuns()"
+            (runClick)="openDialog($event)"
+            (dismissed)="showFirstRunCta.set(false)" />
+        }
+
         @if (!loaded) {
           @for (i of [1,2,3]; track i) {
             <div class="skeleton"></div>
@@ -267,14 +215,25 @@ import { environment } from '../../../environments/environment';
             <div class="empty-icon">🏃</div>
             <div class="empty-title">No runs found</div>
             <div class="empty-sub">Try a different filter or check back soon</div>
+            @if (hasFiltersToClear) {
+              <button class="empty-btn" (click)="clearAllFilters()">Clear all filters</button>
+            }
           </div>
         } @else {
+          @if (activeTag()) {
+            <div class="active-tag-row">
+              <span class="active-tag-chip">#{{ activeTag() }}</span>
+              <button class="clear-tag-btn" (click)="setActiveTag(null)">✕ Clear filter</button>
+            </div>
+          }
           @for (run of feedRuns(); track run.id) {
             <app-run-card
               [run]="run"
               [isJoined]="runsService.getJoinedRunIds()().includes(run.id)"
+              [activeTag]="activeTag()"
               (cardClick)="openDialog(run)"
-              (joinToggle)="onJoin($event)" />
+              (joinToggle)="onJoin($event)"
+              (tagClick)="setActiveTag($event)" />
           }
         }
       </div>
@@ -291,6 +250,12 @@ import { environment } from '../../../environments/environment';
 
     @if (showOnboarding()) {
       <app-onboarding (complete)="onOnboardingComplete($event)" />
+    }
+
+    @if (showLocationModal()) {
+      <app-location-welcome-modal
+        (locationGranted)="onLocationGranted()"
+        (dismissed)="showLocationModal.set(false)" />
     }
   `,
   styles: [`
@@ -355,7 +320,7 @@ import { environment } from '../../../environments/environment';
       font-family: inherit;
       flex: 1;
     }
-    .search-box input::placeholder { color: #B0B0AE; }
+    .search-box input::placeholder { color: #6B6B68; }
     .filter-btn {
       background: #F7F7F5;
       border: none;
@@ -377,7 +342,7 @@ import { environment } from '../../../environments/environment';
       right: 76px;
       background: #fff;
       border-radius: 14px;
-      box-shadow: 0 4px 24px rgba(0,0,0,0.12), 0 0 0 0.5px rgba(0,0,0,0.08);
+      box-shadow: var(--shadow-overlay, 0 8px 32px rgba(13,13,12,0.16)), 0 0 0 0.5px rgba(0,0,0,0.08);
       z-index: 200;
       overflow: hidden;
     }
@@ -386,7 +351,7 @@ import { environment } from '../../../environments/environment';
     }
     .sr-empty {
       font-size: 13px;
-      color: #9B9B98;
+      color: #6B6B68;
       text-align: center;
     }
     .search-result-row {
@@ -423,7 +388,7 @@ import { environment } from '../../../environments/environment';
     }
     .sr-meta {
       font-size: 12px;
-      color: #9B9B98;
+      color: #6B6B68;
       margin-top: 1px;
     }
     .sr-pace {
@@ -440,226 +405,37 @@ import { environment } from '../../../environments/environment';
     .sr-pace-fast, .sr-pace-tempo { background: #FEF2F2; color: #7f1d1d; }
     .sr-pace-default { display: none; }
 
-    /* ── Category tiles ─────────────────────────────────────── */
-    .categories {
-      display: flex;
-      gap: 12px;
-      padding: 0 16px 22px;
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
-    }
-    .categories::-webkit-scrollbar { display: none; }
-
-    .cat-wrap {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 7px;
-      cursor: pointer;
-      flex-shrink: 0;
-    }
-
-    .cat-tile {
-      width: 72px; height: 72px;
-      border-radius: 20px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: transform 0.15s ease;
-    }
-    .cat-tile:active { transform: scale(0.93); }
-    .cat-tile.cat-active {
-      box-shadow: 0 0 0 3px #fff, 0 0 0 5px #0D0D0D;
-    }
-
-    .cat-emoji { font-size: 30px; line-height: 1; }
-
-    .cat-label {
-      font-size: 12px;
-      font-weight: 500;
-      color: #9B9B98;
-      white-space: nowrap;
-    }
-    .cat-label.label-active {
-      color: #0D0D0D;
-      font-weight: 700;
-    }
-
-    /* ── Section headers ─────────────────────────────────────── */
-    .section-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 0 20px 12px;
-    }
-    .section-title {
-      font-size: 17px;
-      font-weight: 700;
-      color: #0D0D0D;
-      letter-spacing: -0.2px;
-    }
-    .section-link {
-      font-size: 13px;
-      font-weight: 500;
-      color: #1D9E75;
-      text-decoration: none;
-    }
-
-    /* ── Clubs carousel ─────────────────────────────────────── */
-    .clubs-carousel {
-      display: flex;
-      gap: 12px;
-      padding: 0 16px 24px;
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
-    }
-    .clubs-carousel::-webkit-scrollbar { display: none; }
-
-    .club-card {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 6px;
-      flex-shrink: 0;
-      cursor: pointer;
-      text-decoration: none;
-      width: 72px;
-    }
-    .club-av {
-      width: 56px; height: 56px;
-      border-radius: 18px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 22px; font-weight: 700; color: #fff;
-    }
-    .club-name {
-      font-size: 11px; font-weight: 600; color: #0D0D0D;
-      text-align: center;
-      max-width: 70px;
-      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    }
-    .club-meta {
-      font-size: 10px; color: #9B9B98;
-      text-align: center;
-    }
-
-    /* ── Featured clubs ─────────────────────────────────────── */
-    .featured-clubs-row {
-      display: flex;
-      gap: 10px;
-      padding: 0 16px 24px;
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
-    }
-    .featured-clubs-row::-webkit-scrollbar { display: none; }
-
-    .fc-card {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      flex-shrink: 0;
-      background: #fff;
-      border-radius: 14px;
-      padding: 10px 14px;
-      text-decoration: none;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.07), 0 0 0 0.5px rgba(0,0,0,0.05);
-      min-width: 160px;
-    }
-    .fc-av {
-      width: 40px; height: 40px;
-      border-radius: 12px;
-      flex-shrink: 0;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 18px; font-weight: 700; color: #fff;
-    }
-    .fc-info { min-width: 0; }
-    .fc-name {
-      font-size: 13px; font-weight: 600; color: #0D0D0D;
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    }
-    .fc-meta { font-size: 11px; color: #9B9B98; margin-top: 1px; }
-    .fc-pace {
-      display: inline-block;
-      margin-top: 4px;
-      font-size: 10px; font-weight: 600;
-      background: #E1F5EE; color: #0F6E56;
-      border-radius: 999px; padding: 2px 8px;
-      text-transform: capitalize;
-    }
-
-    /* ── Horizontal run carousel ─────────────────────────────── */
-    .h-carousel {
-      display: flex;
-      gap: 12px;
-      padding: 0 16px 24px;
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
-    }
-    .h-carousel::-webkit-scrollbar { display: none; }
-
-    .h-card {
-      flex-shrink: 0;
-      width: 200px;
-      background: #fff;
-      border-radius: 16px;
-      overflow: hidden;
-      box-shadow: 0 1px 6px rgba(0,0,0,0.07), 0 0 0 0.5px rgba(0,0,0,0.06);
-      cursor: pointer;
-    }
-    .h-banner {
-      height: 90px;
-      position: relative;
-      display: flex;
-      align-items: flex-end;
-      justify-content: space-between;
-      padding: 8px 10px;
-    }
-    .h-dist {
-      background: rgba(0,0,0,0.28);
-      backdrop-filter: blur(6px);
-      color: #fff;
-      border-radius: 999px;
-      padding: 3px 9px;
-      font-size: 12px; font-weight: 600;
-    }
-    .h-going {
-      font-size: 11px; font-weight: 500; color: rgba(255,255,255,0.9);
-    }
-    .h-body { padding: 10px 10px 12px; }
-    .h-title {
-      font-size: 13px; font-weight: 600; color: #0D0D0D;
-      margin-bottom: 3px;
-      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
-    }
-    .h-date { font-size: 11px; color: #9B9B98; }
-
     /* ── Feed ───────────────────────────────────────────────── */
     .feed-header { padding: 0 20px 14px; }
 
-    .type-pills-row {
+    .type-pills-row, .pace-pills-row {
       display: flex;
       gap: 8px;
       overflow-x: auto;
       -webkit-overflow-scrolling: touch;
-      padding-top: 12px;
+      padding: 12px 20px 0;
       margin: 0 -20px;
-      padding-left: 20px;
-      padding-right: 20px;
     }
-    .type-pills-row::-webkit-scrollbar { display: none; }
+    .pace-pills-row { padding-top: 10px; }
+    .type-pills-row::-webkit-scrollbar, .pace-pills-row::-webkit-scrollbar { display: none; }
 
-    .pace-pills-row {
-      display: flex;
-      gap: 8px;
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
-      padding-top: 10px;
-      margin: 0 -20px;
-      padding-left: 20px;
-      padding-right: 20px;
+    .active-tag-row {
+      display: flex; align-items: center; gap: 8px;
+      padding: 0 20px 12px;
     }
-    .pace-pills-row::-webkit-scrollbar { display: none; }
+    .active-tag-chip {
+      font-size: 12px; font-weight: 600;
+      background: #0F6E56; color: #fff;
+      border-radius: 999px; padding: 4px 12px;
+    }
+    .clear-tag-btn {
+      font-size: 12px; font-weight: 500; color: #6B6B68;
+      background: #F7F7F5; border: none; border-radius: 999px;
+      padding: 4px 10px; cursor: pointer; font-family: inherit;
+    }
+    .clear-tag-btn:hover { background: #EAEAE8; }
 
-    .pace-pill {
+    .pace-pill, .type-pill, .near-me-btn {
       flex-shrink: 0;
       background: #F7F7F5;
       border: 1.5px solid transparent;
@@ -674,20 +450,6 @@ import { environment } from '../../../environments/environment';
     }
     .pace-pill.pace-active {
       border-color: currentColor;
-    }
-
-    .type-pill {
-      flex-shrink: 0;
-      background: #F7F7F5;
-      border: 1.5px solid transparent;
-      border-radius: 999px;
-      padding: 6px 14px;
-      font-size: 13px; font-weight: 500;
-      color: #6B6B68;
-      cursor: pointer;
-      font-family: inherit;
-      transition: background 0.12s, color 0.12s, border-color 0.12s;
-      white-space: nowrap;
     }
     .type-pill.active {
       background: #0D0D0D;
@@ -719,7 +481,7 @@ import { environment } from '../../../environments/environment';
       border-radius: 999px;
       padding: 5px 12px;
       font-size: 12px; font-weight: 500;
-      color: #9B9B98;
+      color: #6B6B68;
       cursor: pointer;
       font-family: inherit;
       transition: background 0.15s, color 0.15s;
@@ -732,7 +494,7 @@ import { environment } from '../../../environments/environment';
 
     .feed-surface {
       background: #F7F7F5;
-      border-radius: 24px 24px 0 0;
+      border-radius: var(--radius-sheet, 24px) var(--radius-sheet, 24px) 0 0;
       padding: 16px 14px 120px;
       display: flex;
       flex-direction: column;
@@ -753,11 +515,28 @@ import { environment } from '../../../environments/environment';
 
     .empty {
       text-align: center;
-      padding: 60px 20px;
+      padding: 48px 20px 56px;
     }
-    .empty-icon { font-size: 40px; margin-bottom: 12px; }
-    .empty-title { font-size: 16px; font-weight: 600; color: #0D0D0D; margin-bottom: 6px; }
-    .empty-sub { font-size: 14px; color: #9B9B98; }
+    .empty-icon {
+      font-size: 34px; line-height: 1;
+      width: 76px; height: 76px;
+      margin: 0 auto 16px;
+      background: var(--klub-green-light, #E1F5EE);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .empty-title { font-size: 17px; font-weight: 700; color: #0D0D0D; margin-bottom: 6px; letter-spacing: -0.01em; }
+    .empty-sub { font-size: 14px; color: #6B6B68; }
+    .empty-btn {
+      margin-top: 18px;
+      background: var(--klub-black, #0D0D0D); color: #fff;
+      border: none; border-radius: var(--radius-pill, 999px);
+      padding: 11px 22px; min-height: 44px;
+      font-size: 14px; font-weight: 600;
+      cursor: pointer; font-family: inherit;
+      transition: transform 0.15s var(--ease-out, ease-out);
+    }
+    .empty-btn:active { transform: scale(0.96); }
 
     /* ── Error banner ─────────────────────────────────────────── */
     .error-banner {
@@ -790,18 +569,6 @@ import { environment } from '../../../environments/environment';
       align-items: center;
       gap: 12px;
       padding-top: 10px;
-    }
-    .near-me-btn {
-      flex-shrink: 0;
-      background: #F7F7F5;
-      border: 1.5px solid transparent;
-      border-radius: 999px;
-      padding: 6px 14px;
-      font-size: 13px; font-weight: 500;
-      color: #6B6B68;
-      cursor: pointer;
-      font-family: inherit;
-      transition: background 0.12s, color 0.12s, border-color 0.12s;
     }
     .near-me-btn.near-me-active {
       background: #E1F5EE;
@@ -837,6 +604,7 @@ export class HomeComponent implements OnInit {
   destroyRef = inject(DestroyRef);
   private http = inject(HttpClient);
   private geoService = inject(GeoService);
+  private geolocationService = inject(GeolocationService);
 
   selectedRun = signal<RunEvent | null>(null);
   errorMessage = signal<string | null>(null);
@@ -846,10 +614,16 @@ export class HomeComponent implements OnInit {
   feedMode = signal<'all' | 'mine'>('all');
   activeRunType = signal<string | null>(null);
   activePace = signal<string | null>(null);
+  activeTag = signal<string | null>(null);
   showOnboarding = signal(false);
   userCoordinates = signal<Coordinates | null>(null);
   nearMeEnabled = signal(false);
   radiusMiles = signal(10);
+
+  // Onboarding funnel
+  showLocationModal = signal(false);
+  nearbyRuns = signal<RunEvent[]>([]);
+  showFirstRunCta = signal(false);
 
   readonly feedRuns = computed(() => {
     const pace = this.activePace();
@@ -867,8 +641,10 @@ export class HomeComponent implements OnInit {
       }
     }
 
-    if (!pace) return runs;
-    return runs.filter(r => r.pace === pace);
+    if (pace) runs = runs.filter(r => r.pace === pace);
+    const tag = this.activeTag();
+    if (tag) runs = runs.filter(r => (r.tags ?? []).some(t => t.toLowerCase() === tag.toLowerCase()));
+    return runs;
   });
 
   readonly featuredClubs = computed(() => this.clubs().slice(0, 4));
@@ -883,10 +659,7 @@ export class HomeComponent implements OnInit {
   private searchSubject = new Subject<string>();
   private currentParams: any = {};
 
-  private readonly clubColours = [
-    '#1D9E75', '#3B82F6', '#F59E0B', '#EC4899',
-    '#8B5CF6', '#EF4444', '#10B981', '#6366F1',
-  ];
+  readonly gradientForPace = gradientForPace;
 
   readonly pacePills = [
     { value: 'social',   label: 'Social',   color: '#10B981', effort: 'chatty pace' },
@@ -904,7 +677,7 @@ export class HomeComponent implements OnInit {
     { value: 'trail_run',      label: 'Trail',     emoji: '🌲' },
   ];
 
-  categories = [
+  categories: HomeCategory[] = [
     { label: 'All',      emoji: '🏃', bg: '#0D0D0D', params: {} },
     { label: '5K',       emoji: '🎯', bg: '#3B82F6', params: { tags: '5k' } },
     { label: 'Trail',    emoji: '🌲', bg: '#10B981', params: { tags: 'trail' } },
@@ -930,6 +703,24 @@ export class HomeComponent implements OnInit {
     return this.activeCategory !== 'All' || !!this.searchQuery;
   }
 
+  get hasFiltersToClear(): boolean {
+    return this.hasActiveFilters || !!this.activePace() || !!this.activeRunType() || !!this.activeTag() || this.nearMeEnabled();
+  }
+
+  clearAllFilters(): void {
+    this.activePace.set(null);
+    this.activeRunType.set(null);
+    this.activeTag.set(null);
+    this.searchQuery = '';
+    this.activeCategory = 'All';
+    this.currentParams = {};
+    if (this.nearMeEnabled()) {
+      this.nearMeEnabled.set(false);
+      localStorage.setItem('nearMeEnabled', 'false');
+    }
+    this.loadWithParams();
+  }
+
   @HostListener('document:click', ['$event'])
   onDocumentClick(e: MouseEvent) {
     const target = e.target as HTMLElement;
@@ -946,6 +737,7 @@ export class HomeComponent implements OnInit {
   ngOnInit() {
     if (!localStorage.getItem('onboarded')) this.showOnboarding.set(true);
     this.loadGeoPreferences();
+    this.initLocationFunnel();
     this.detectLocation();
     this.loadWithParams();
     this.loadCarousels();
@@ -1000,6 +792,17 @@ export class HomeComponent implements OnInit {
   }
 
   private detectLocation() {
+    const status = this.geolocationService.status();
+    const coords = this.geolocationService.coordinates();
+    if (status === 'granted' && coords) {
+      this.applyCoordinates(coords.lat, coords.lng);
+      return;
+    }
+    if (status === 'denied') {
+      this.locationLabel.set('Near you');
+      return;
+    }
+    // Fallback silent detection (for users who granted via browser directly)
     if (!navigator.geolocation) {
       this.locationLabel.set('Near you');
       return;
@@ -1007,20 +810,58 @@ export class HomeComponent implements OnInit {
     navigator.geolocation.getCurrentPosition(
       pos => {
         const { latitude, longitude } = pos.coords;
-        this.userCoordinates.set({ lat: latitude, lng: longitude });
-        this.http.get<{ formatted_address: string }>(`${environment.apiUrl}/geocode?address=${latitude},${longitude}`)
-          .subscribe({
-            next: r => {
-              const city = this.parseCityFromAddress(r.formatted_address);
-              this.locationLabel.set(city);
-              this.cdr.markForCheck();
-            },
-            error: () => this.locationLabel.set('Near you')
-          });
+        this.applyCoordinates(latitude, longitude);
       },
       () => this.locationLabel.set('Near you'),
-      { timeout: 8000 }
+      { timeout: 8000, maximumAge: 300000 }
     );
+  }
+
+  private applyCoordinates(latitude: number, longitude: number) {
+    this.userCoordinates.set({ lat: latitude, lng: longitude });
+    this.http.get<{ formatted_address: string }>(`${environment.apiUrl}/geocode?address=${latitude},${longitude}`)
+      .subscribe({
+        next: r => {
+          const city = this.parseCityFromAddress(r.formatted_address);
+          this.locationLabel.set(city);
+          this.cdr.markForCheck();
+        },
+        error: () => this.locationLabel.set('Near you')
+      });
+  }
+
+  private initLocationFunnel() {
+    // Only show modal if user hasn't made a consent decision yet
+    // and hasn't dismissed the first-run CTA before (proxy for "new user")
+    const consent = this.geolocationService.getStoredConsent();
+    const ctaDismissed = typeof window !== 'undefined'
+      && window.localStorage?.getItem('klub-first-run-dismissed') === '1';
+
+    if (!consent && !ctaDismissed) {
+      this.showLocationModal.set(true);
+      return;
+    }
+
+    // Restore previous grant silently
+    if (consent === 'granted') {
+      this.geolocationService.restoreFromConsent();
+    }
+  }
+
+  onLocationGranted() {
+    this.showLocationModal.set(false);
+    const coords = this.geolocationService.coordinates();
+    if (!coords) return;
+    this.applyCoordinates(coords.lat, coords.lng);
+    this.runsService.getNearbyRuns(coords.lat, coords.lng, 3)
+      .subscribe({
+        next: runs => {
+          this.nearbyRuns.set(runs);
+          this.showFirstRunCta.set(runs.length > 0);
+          this.cdr.markForCheck();
+        },
+        error: () => { /* silently skip CTA on error */ }
+      });
   }
 
   private parseCityFromAddress(address: string): string {
@@ -1103,6 +944,10 @@ export class HomeComponent implements OnInit {
 
   setPace(pace: string | null) { this.activePace.set(pace); }
 
+  setActiveTag(tag: string | null) {
+    this.activeTag.set(this.activeTag() === tag ? null : tag);
+  }
+
   private loadWithParams() {
     this.loaded = false;
     const runType = this.activeRunType();
@@ -1118,20 +963,4 @@ export class HomeComponent implements OnInit {
     this.toast.show(isJoined ? 'Left the run' : "You're in!");
   }
 
-  gradientForPace(pace?: string): string {
-    const g: Record<string, string> = {
-      easy:     'linear-gradient(135deg, #1D9E75 0%, #0a5c42 100%)',
-      social:   'linear-gradient(135deg, #10B981 0%, #065f46 100%)',
-      moderate: 'linear-gradient(135deg, #3B82F6 0%, #1e3a8a 100%)',
-      fast:     'linear-gradient(135deg, #EF4444 0%, #7f1d1d 100%)',
-      tempo:    'linear-gradient(135deg, #F59E0B 0%, #78350f 100%)',
-    };
-    return g[pace ?? ''] ?? 'linear-gradient(135deg, #1D9E75 0%, #0D0D0D 100%)';
-  }
-
-  clubColor(clubId: string): string {
-    let hash = 0;
-    for (let i = 0; i < clubId.length; i++) { hash = (hash * 31 + clubId.charCodeAt(i)) >>> 0; }
-    return this.clubColours[hash % this.clubColours.length];
-  }
 }

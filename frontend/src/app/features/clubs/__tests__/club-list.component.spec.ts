@@ -2,6 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
+import { signal } from '@angular/core';
 import { of } from 'rxjs';
 import { ClubListComponent } from '../club-list.component';
 import { ClubService } from '../../../core/services/club.service';
@@ -26,6 +27,7 @@ describe('ClubListComponent', () => {
       listClubs: jest.fn().mockReturnValue(of([makeClub()]))
     };
     authService = {
+      getUser: jest.fn().mockReturnValue(signal(null)),
       isOrganizer: jest.fn().mockReturnValue(false),
       isLoggedIn: jest.fn().mockReturnValue(false)
     };

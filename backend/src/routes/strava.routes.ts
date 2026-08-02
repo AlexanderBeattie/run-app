@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import { pool } from '../db';
+import { encrypt } from '../utils/crypto.util';
 
 const router = Router();
 
@@ -151,8 +152,8 @@ router.get('/strava/callback', async (req: Request, res: Response) => {
        WHERE id = $5`,
       [
         stravaData.athlete.id,
-        stravaData.access_token,
-        stravaData.refresh_token,
+        encrypt(stravaData.access_token),
+        encrypt(stravaData.refresh_token),
         stravaData.expires_at,
         userId,
       ],

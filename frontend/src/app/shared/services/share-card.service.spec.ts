@@ -51,8 +51,12 @@ function setupCanvasMock() {
     callback(new Blob(['fake-png'], { type: 'image/png' }));
   });
 
-  HTMLCanvasElement.prototype.getContext = jest.fn().mockReturnValue(mockCtx);
-  HTMLCanvasElement.prototype.toBlob = mockToBlob;
+  Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
+    configurable: true, writable: true, value: jest.fn().mockReturnValue(mockCtx),
+  });
+  Object.defineProperty(HTMLCanvasElement.prototype, 'toBlob', {
+    configurable: true, writable: true, value: mockToBlob,
+  });
 
   return { mockCtx, mockToBlob };
 }
@@ -131,7 +135,10 @@ describe('ShareCardService', () => {
     });
 
     it('rejects when toBlob returns null', async () => {
-      HTMLCanvasElement.prototype.toBlob = jest.fn().mockImplementation((cb: BlobCallback) => cb(null));
+      Object.defineProperty(HTMLCanvasElement.prototype, 'toBlob', {
+        configurable: true, writable: true,
+        value: jest.fn().mockImplementation((cb: BlobCallback) => cb(null)),
+      });
       await expect(service.generateShareCard(mockRun)).rejects.toThrow('Canvas toBlob returned null');
     });
   });

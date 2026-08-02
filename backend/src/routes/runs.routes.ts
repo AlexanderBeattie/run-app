@@ -92,8 +92,72 @@ router.get('/mine', requireAuth, async (req: AuthRequest, res: Response) => {
 
 router.get('/joined', requireAuth, async (req: AuthRequest, res: Response) => {
   try {
-    const result = await pool.query(`SELECT r.*, COALESCE(json_agg(ra2.user_id) FILTER (WHERE ra2.user_id IS NOT NULL), '[]') AS attendees FROM run_events r JOIN run_attendees ra ON ra.run_id = r.id AND ra.user_id = $1 LEFT JOIN run_attendees ra2 ON ra2.run_id = r.id GROUP BY r.id ORDER BY r.event_date ASC`, [req.user!.id]);
+    const result = await pool.query(`SELECT r.*, ra.strava_polyline, COALESCE(json_agg(ra2.user_id) FILTER (WHERE ra2.user_id IS NOT NULL), '[]') AS attendees FROM run_events r JOIN run_attendees ra ON ra.run_id = r.id AND ra.user_id = $1 LEFT JOIN run_attendees ra2 ON ra2.run_id = r.id GROUP BY r.id, ra.strava_polyline ORDER BY r.event_date ASC`, [req.user!.id]);
     res.json(result.rows);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+function wmoToWeather(code: number): { icon: string; condition: string } {
+  if (code === 0) return { icon: '☀️', condition: 'Clear' };
+  if (code <= 3) return { icon: '⛅', condition: 'Partly Cloudy' };
+  if (code <= 48) return { icon: '🌫️', condition: 'Foggy' };
+  if (code <= 55) return { icon: '🌦️', condition: 'Drizzle' };
+  if (code <= 65) return { icon: '🌧️', condition: 'Rain' };
+  if (code <= 77) return { icon: '❄️', condition: 'Snow' };
+  if (code <= 82) return { icon: '🌧️', condition: 'Showers' };
+  if (code <= 86) return { icon: '❄️', condition: 'Snow Showers' };
+  return { icon: '⛈️', condition: 'Thunderstorm' };
+}
+
+// GET /api/runs/nearby?lat=&lng=&limit=  — ordered by haversine distance
+router.get('/nearby', async (req: Request, res: Response) => {
+  const lat = parseFloat(req.query.lat as string);
+  const lng = parseFloat(req.query.lng as string);
+  const limit = Math.min(parseInt((req.query.limit as string) || '3', 10), 20);
+
+  if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+    res.status(400).json({ error: 'Valid lat and lng query params are required' });
+    return;
+  }
+
+  try {
+    const result = await pool.query(`
+      SELECT r.*,
+        c.name AS club_name,
+        c.created_at AS club_created_at,
+        COALESCE(json_agg(ra.user_id) FILTER (WHERE ra.user_id IS NOT NULL), '[]') AS attendees,
+        (3959 * acos(LEAST(1.0,
+          cos(radians($1)) * cos(radians(r.start_lat::float))
+            * cos(radians(r.start_lng::float) - radians($2))
+          + sin(radians($1)) * sin(radians(r.start_lat::float))
+        ))) AS distance_miles
+      FROM run_events r
+      LEFT JOIN run_attendees ra ON ra.run_id = r.id
+      LEFT JOIN clubs c ON r.club_id = c.id
+      WHERE r.status = 'active'
+        AND r.event_date >= CURRENT_TIMESTAMP
+        AND r.start_lat IS NOT NULL
+        AND r.start_lng IS NOT NULL
+      GROUP BY r.id, c.id
+      ORDER BY distance_miles ASC
+      LIMIT $3
+    `, [lat, lng, limit]);
+    res.json(result.rows);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+router.get('/:id/weather', async (req: Request, res: Response) => {
+  try {
+    const result = await pool.query('SELECT start_lat, start_lng FROM run_events WHERE id = $1', [req.params.id]);
+    if (!result.rows.length) { res.status(404).json({ error: 'Not found' }); return; }
+    const { start_lat, start_lng } = result.rows[0];
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${start_lat}&longitude=${start_lng}&current=temperature_2m,weathercode`;
+    const weatherRes = await fetch(url);
+    if (!weatherRes.ok) { res.status(502).json({ error: 'Weather service unavailable' }); return; }
+    const data: any = await weatherRes.json();
+    const temp = Math.round(data.current.temperature_2m);
+    const { icon, condition } = wmoToWeather(data.current.weathercode);
+    res.json({ temp, condition, icon });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
@@ -107,7 +171,20 @@ router.get('/:id', async (req: Request, res: Response) => {
 
 router.get('/:id/attendees', async (req: Request, res: Response) => {
   try {
-    const result = await pool.query(`SELECT u.id, u.display_name, ra.joined_at FROM run_attendees ra JOIN users u ON u.id = ra.user_id WHERE ra.run_id = $1 ORDER BY ra.joined_at ASC`, [req.params.id]);
+    const result = await pool.query(
+      `SELECT u.id, u.display_name, ra.joined_at,
+        EXISTS(
+          SELECT 1 FROM run_attendees ra2
+          WHERE ra2.user_id = u.id
+            AND ra2.strava_activity_id IS NOT NULL
+            AND ra2.strava_average_speed > 0
+        ) AS has_verified_pace
+       FROM run_attendees ra
+       JOIN users u ON u.id = ra.user_id
+       WHERE ra.run_id = $1
+       ORDER BY ra.joined_at ASC`,
+      [req.params.id]
+    );
     res.json(result.rows);
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
@@ -285,6 +362,67 @@ router.post('/:id/join', requireAuth, async (req: AuthRequest, res: Response) =>
       res.json({ joined: true });
     }
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// GET /api/runs/:id/comments — fetch comments for a run with user details
+router.get('/:id/comments', requireAuth, async (req: AuthRequest, res: Response) => {
+  const { id } = req.params;
+  try {
+    const result = await pool.query(
+      `SELECT rc.id, rc.run_id, rc.user_id, rc.content, rc.created_at,
+              u.display_name, u.avatar_url
+       FROM run_comments rc
+       JOIN users u ON rc.user_id = u.id
+       WHERE rc.run_id = $1
+       ORDER BY rc.created_at ASC`,
+      [id]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// POST /api/runs/:id/comments — create a new comment on a run
+router.post('/:id/comments', requireAuth, async (req: AuthRequest, res: Response) => {
+  const { id } = req.params;
+  const { content } = req.body;
+
+  if (!content || typeof content !== 'string' || content.trim() === '') {
+    res.status(400).json({ error: 'Content is required and must be a non-empty string' });
+    return;
+  }
+
+  try {
+    const result = await pool.query(
+      `INSERT INTO run_comments (run_id, user_id, content)
+       VALUES ($1, $2, $3)
+       RETURNING id, run_id, user_id, content, created_at`,
+      [id, req.user!.id, content.trim()]
+    );
+
+    if (!result.rows.length) {
+      res.status(500).json({ error: 'Failed to create comment' });
+      return;
+    }
+
+    const commentId = result.rows[0].id;
+
+    const fullComment = await pool.query(
+      `SELECT rc.id, rc.run_id, rc.user_id, rc.content, rc.created_at,
+              u.display_name, u.avatar_url
+       FROM run_comments rc
+       JOIN users u ON rc.user_id = u.id
+       WHERE rc.id = $1`,
+      [commentId]
+    );
+
+    res.status(201).json(fullComment.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
 });
 
 export default router;

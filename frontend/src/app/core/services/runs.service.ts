@@ -1,7 +1,7 @@
 import { Injectable, signal, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { map } from 'rxjs/operators';
-import { RunEvent, CreateRunPayload } from '../models/run-event.model';
+import { RunEvent, CreateRunPayload, Comment } from '../models/run-event.model';
 import { environment } from '../../../environments/environment';
 
 @Injectable({ providedIn: 'root' })
@@ -25,7 +25,10 @@ export class RunsService {
       status: r.status, createdBy: r.created_by,
       pace: r.pace, tags: r.tags,
       runType: r.run_type,
-      club_name: r.club_name, club_created_at: r.club_created_at
+      club_name: r.club_name, club_created_at: r.club_created_at,
+      distanceFromUserKm: r.distance_miles !== undefined
+        ? parseFloat((r.distance_miles * 1.60934).toFixed(2))
+        : undefined
     };
   }
 
@@ -71,12 +74,18 @@ export class RunsService {
     );
   }
 
+  getNearbyRuns(lat: number, lng: number, limit = 3) {
+    return this.http.get<any[]>(`${environment.apiUrl}/runs/nearby`, {
+      params: { lat, lng, limit }
+    }).pipe(map(data => data.map(r => this.mapRun(r))));
+  }
+
   getMyRuns() { return this.http.get<any[]>(`${environment.apiUrl}/runs/mine`); }
   getJoinedRuns() { return this.http.get<any[]>(`${environment.apiUrl}/runs/joined`); }
   getRunById(id: string) { return this.http.get<any>(`${environment.apiUrl}/runs/${id}`); }
 
   getAttendees(runId: string) {
-    return this.http.get<{ id: string; display_name: string; joined_at: string }[]>(`${environment.apiUrl}/runs/${runId}/attendees`);
+    return this.http.get<{ id: string; display_name: string; joined_at: string; has_verified_pace: boolean }[]>(`${environment.apiUrl}/runs/${runId}/attendees`);
   }
 
   toggleJoin(runId: string, userId: string) {
@@ -126,6 +135,26 @@ export class RunsService {
     strava_polyline: string | null;
   }) {
     return this.http.post<{ success: boolean; data: any }>(`${environment.apiUrl}/runs/${runId}/link-strava`, payload);
+  }
+
+  getComments(runId: string) {
+    return this.http.get<any[]>(`${environment.apiUrl}/runs/${runId}/comments`).pipe(
+      map(data => data.map(c => ({
+        id: c.id, runId: c.run_id, userId: c.user_id, content: c.content,
+        displayName: c.display_name, avatarUrl: c.avatar_url,
+        createdAt: new Date(c.created_at)
+      } as Comment)))
+    );
+  }
+
+  postComment(runId: string, content: string) {
+    return this.http.post<any>(`${environment.apiUrl}/runs/${runId}/comments`, { content }).pipe(
+      map(c => ({
+        id: c.id, runId: c.run_id, userId: c.user_id, content: c.content,
+        displayName: c.display_name, avatarUrl: c.avatar_url,
+        createdAt: new Date(c.created_at)
+      } as Comment))
+    );
   }
 
   createRun(payload: CreateRunPayload) { return this.http.post<any>(`${environment.apiUrl}/runs`, payload); }

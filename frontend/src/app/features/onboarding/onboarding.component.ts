@@ -89,7 +89,7 @@ export interface OnboardingPrefs {
     }
     .sheet {
       background: #fff;
-      border-radius: 24px 24px 0 0;
+      border-radius: var(--radius-sheet, 24px) var(--radius-sheet, 24px) 0 0;
       width: 100%; max-width: 560px;
       padding: 32px 24px 48px;
       animation: slideUp 0.35s cubic-bezier(0.32,0.72,0,1);
@@ -153,13 +153,13 @@ export interface OnboardingPrefs {
       font-size: 15px; font-weight: 600; color: #0D0D0D;
     }
     .pill-effort {
-      font-size: 13px; color: #9B9B98;
+      font-size: 13px; color: #6B6B68;
     }
     .pill.selected .pill-label { color: #0F6E56; }
     .pill.selected .pill-effort { color: #1D9E75; }
 
     .cta {
-      background: #1D9E75; color: #fff;
+      background: #0F6E56; color: #fff;
       border: none; border-radius: 14px;
       padding: 16px; font-size: 16px; font-weight: 600;
       cursor: pointer; font-family: inherit;
@@ -167,7 +167,7 @@ export interface OnboardingPrefs {
     }
     .skip {
       background: none; border: none;
-      font-size: 14px; color: #9B9B98;
+      font-size: 14px; color: #6B6B68;
       cursor: pointer; font-family: inherit;
       padding: 4px;
     }

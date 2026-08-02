@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS users (
   strava_access_token      TEXT,
   strava_refresh_token     TEXT,
   strava_token_expires_at  BIGINT,
+  avatar_url    TEXT,
   created_at    TIMESTAMP    DEFAULT NOW(),
   CONSTRAINT users_role_check CHECK (role IN ('runner', 'organizer'))
 );
@@ -28,8 +29,9 @@ CREATE TABLE IF NOT EXISTS clubs (
   owner_id     UUID         REFERENCES users(id) ON DELETE CASCADE,
   member_count INTEGER      DEFAULT 0,
   logo_url     TEXT,
+  color        VARCHAR(7)   DEFAULT '#1D9E75',
   city         VARCHAR(100),
-  -- pace uses the same label set as run_events.pace: 'easy' | 'social' | 'moderate' | 'fast' | 'tempo'
+  -- pace: PaceCategory — 'easy' | 'social' | 'moderate' | 'tempo' | 'fast'
   pace         VARCHAR(20),
   tags         TEXT[]       DEFAULT '{}',
   created_at   TIMESTAMP    DEFAULT NOW(),
@@ -70,6 +72,7 @@ CREATE TABLE IF NOT EXISTS run_events (
   created_by        UUID          REFERENCES users(id),
   created_at        TIMESTAMP     DEFAULT NOW(),
   CONSTRAINT run_events_status_check   CHECK (status   IN ('active', 'cancelled', 'completed')),
+  CONSTRAINT run_events_pace_check     CHECK (pace     IN ('easy', 'social', 'moderate', 'tempo', 'fast') OR pace IS NULL),
   CONSTRAINT run_events_run_type_check CHECK (run_type IN ('club_run', 'parkrun_style', 'one_off_race', 'training_group', 'trail_run') OR run_type IS NULL)
 );
 
@@ -136,3 +139,15 @@ CREATE INDEX IF NOT EXISTS idx_run_attendees_strava_activity_id    ON run_attend
 CREATE INDEX IF NOT EXISTS idx_strava_webhooks_user_id             ON strava_webhooks(user_id);
 CREATE INDEX IF NOT EXISTS idx_strava_webhooks_object_id           ON strava_webhooks(object_id);
 CREATE INDEX IF NOT EXISTS idx_strava_webhooks_processed           ON strava_webhooks(processed) WHERE processed = false;
+
+-- ─── Run Comments ──────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS run_comments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  run_id UUID NOT NULL REFERENCES run_events(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  content TEXT NOT NULL,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_run_comments_run_id ON run_comments(run_id);
+CREATE INDEX IF NOT EXISTS idx_run_comments_user_id ON run_comments(user_id);

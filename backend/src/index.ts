@@ -28,7 +28,8 @@ app.use(
   })
 );
 
-app.use(express.json());
+app.use(express.json({ limit: '5mb' }));
+app.use(express.urlencoded({ limit: '5mb', extended: true }));
 
 // Rate limiting — applied before routes
 app.use('/api', apiLimiter);
@@ -48,6 +49,15 @@ app.get('/api/health', (_req, res) => {
     status: 'ok',
     timestamp: new Date().toISOString(),
   });
+});
+
+// Handle payload too large errors
+app.use((err: { type?: string; status?: number }, _req: express.Request, res: express.Response, next: express.NextFunction) => {
+  if (err.type === 'entity.too.large' || err.status === 413) {
+    res.status(413).json({ error: 'Payload too large. Maximum 5MB allowed.' });
+    return;
+  }
+  next(err);
 });
 
 async function start() {

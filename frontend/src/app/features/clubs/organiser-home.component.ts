@@ -45,7 +45,18 @@ import { ConfirmModalComponent } from '../../shared/components/confirm-modal/con
             <div class="stat-val">{{ totalSignups }}</div>
             <div class="stat-sub">across all runs</div>
           </div>
+          <div class="stat-card stat-card--highlight">
+            <div class="stat-label">Attendees</div>
+            <div class="stat-val">{{ totalAttendeesThisMonth }}</div>
+            <div class="stat-sub">this month</div>
+          </div>
         </div>
+
+        <a routerLink="/clubs/create-run" class="quick-fab" aria-label="Post a run">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5">
+            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+        </a>
 
         @if (nextRun) {
           <div class="next-run-banner">
@@ -144,7 +155,7 @@ import { ConfirmModalComponent } from '../../shared/components/confirm-modal/con
   styles: [`
     .page { background: #0D0D0D; min-height: 100%; }
     .page.embedded { background: transparent; }
-    .header { padding: 16px 20px 20px; }
+    .header { padding: 16px 20px 20px; position: relative; }
     .header-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; }
     .greeting { font-size: 12px; color: rgba(255,255,255,0.5); margin-bottom: 2px; }
     .club-name { font-size: 18px; font-weight: 500; color: #fff; }
@@ -155,8 +166,10 @@ import { ConfirmModalComponent } from '../../shared/components/confirm-modal/con
     .menu-item { display: flex; align-items: center; gap: 8px; width: 100%; padding: 10px 12px; border: none; background: none; color: rgba(255,255,255,0.7); font-size: 14px; font-family: inherit; cursor: pointer; border-radius: 8px; text-align: left; }
     .menu-item:hover { background: rgba(255,255,255,0.08); }
     .menu-item.logout { color: #F87171; }
-    .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+    .stats-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 64px; }
     .stat-card { background: rgba(255,255,255,0.08); border-radius: 14px; padding: 14px; }
+    .stat-card--highlight { background: rgba(29,158,117,0.2); border: 1px solid rgba(29,158,117,0.25); }
+    .quick-fab { position: absolute; bottom: -24px; right: 20px; width: 52px; height: 52px; border-radius: 50%; background: #1D9E75; display: flex; align-items: center; justify-content: center; text-decoration: none; z-index: 20; box-shadow: 0 4px 16px rgba(29,158,117,0.45); }
     .stat-label { font-size: 10px; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
     .stat-val { font-size: 26px; font-weight: 500; color: #fff; line-height: 1; }
     .stat-sub { font-size: 11px; color: rgba(255,255,255,0.35); margin-top: 3px; }
@@ -164,13 +177,13 @@ import { ConfirmModalComponent } from '../../shared/components/confirm-modal/con
     .next-label { font-size: 10px; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 3px; }
     .next-title { font-size: 14px; font-weight: 500; color: #fff; margin-bottom: 2px; }
     .next-meta { font-size: 12px; color: rgba(255,255,255,0.5); }
-    .next-going { background: #1D9E75; color: #E1F5EE; border-radius: 8px; padding: 6px 12px; font-size: 12px; font-weight: 500; white-space: nowrap; flex-shrink: 0; margin-left: 12px; }
-    .content { background: #F7F7F5; border-radius: 20px 20px 0 0; min-height: 50vh; padding: 20px 12px 24px; }
+    .next-going { background: #0F6E56; color: #fff; border-radius: 8px; padding: 6px 12px; font-size: 12px; font-weight: 500; white-space: nowrap; flex-shrink: 0; margin-left: 12px; }
+    .content { background: #F7F7F5; border-radius: var(--radius-sheet, 24px) var(--radius-sheet, 24px) 0 0; min-height: 50vh; padding: 20px 12px 24px; }
     .content-header { display: flex; justify-content: space-between; align-items: center; padding: 0 4px; margin-bottom: 14px; }
-    .section-title { font-size: 11px; font-weight: 500; color: #9B9B98; text-transform: uppercase; letter-spacing: 0.06em; }
+    .section-title { font-size: 11px; font-weight: 500; color: #6B6B68; text-transform: uppercase; letter-spacing: 0.06em; }
     .post-btn { font-size: 13px; font-weight: 500; color: #1D9E75; text-decoration: none; }
     .tabs { display: flex; gap: 4px; margin-bottom: 14px; background: rgba(0,0,0,0.06); border-radius: 10px; padding: 3px; }
-    .tab { flex: 1; border: none; background: none; padding: 7px 4px; font-size: 12px; font-weight: 500; color: #9B9B98; border-radius: 8px; cursor: pointer; font-family: inherit; display: flex; align-items: center; justify-content: center; gap: 5px; }
+    .tab { flex: 1; border: none; background: none; padding: 7px 4px; font-size: 12px; font-weight: 500; color: #6B6B68; border-radius: 8px; cursor: pointer; font-family: inherit; display: flex; align-items: center; justify-content: center; gap: 5px; }
     .tab.active { background: #fff; color: #0D0D0D; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
     .tab-count { font-size: 11px; background: rgba(0,0,0,0.08); color: #6B6B68; border-radius: 999px; padding: 1px 6px; }
     .tab.active .tab-count { background: #E1F5EE; color: #0F6E56; }
@@ -200,7 +213,7 @@ import { ConfirmModalComponent } from '../../shared/components/confirm-modal/con
       flex-shrink: 0;
     }
 
-    .empty { text-align: center; padding: 40px 20px; font-size: 14px; color: #9B9B98; }
+    .empty { text-align: center; padding: 40px 20px; font-size: 14px; color: #6B6B68; }
     .list { display: flex; flex-direction: column; gap: 10px; }
     .run-card { background: #fff; border: 0.5px solid rgba(0,0,0,0.08); border-radius: 14px; padding: 14px; cursor: pointer; }
     .run-card.cancelled { opacity: 0.6; }
@@ -241,6 +254,15 @@ export class OrganiserHomeComponent implements OnInit {
   get initials() { return (this.auth.getUser()()?.displayName ?? '').split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0,2); }
   get activeRuns() { return this.runs.filter(r => r.status !== 'cancelled').length; }
   get totalSignups() { return this.runs.reduce((acc, r) => acc + (r.attendees?.length ?? 0), 0); }
+  get totalAttendeesThisMonth() {
+    const now = new Date();
+    return this.runs
+      .filter(r => {
+        const d = new Date(r.event_date);
+        return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+      })
+      .reduce((acc, r) => acc + (r.attendees?.length ?? 0), 0);
+  }
   get nextRun() { return this.runs.filter(r => r.status !== 'cancelled' && new Date(r.event_date) > new Date()).sort((a,b) => new Date(a.event_date).getTime() - new Date(b.event_date).getTime())[0] ?? null; }
   get upcomingRuns() { return this.runs.filter(r => r.status !== 'cancelled' && new Date(r.event_date) >= new Date()).sort((a,b) => new Date(a.event_date).getTime() - new Date(b.event_date).getTime()); }
   get pastRuns() { return this.runs.filter(r => r.status !== 'cancelled' && new Date(r.event_date) < new Date()).sort((a,b) => new Date(b.event_date).getTime() - new Date(a.event_date).getTime()); }

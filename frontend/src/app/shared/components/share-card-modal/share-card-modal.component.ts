@@ -68,7 +68,7 @@ import { ToastService } from '../../services/toast.service';
     .preview-placeholder {
       width: 100%; aspect-ratio: 1200 / 630; background: #F7F7F5; border-radius: 12px;
       display: flex; flex-direction: column; align-items: center; justify-content: center;
-      gap: 12px; color: #9B9B98; font-size: 14px;
+      gap: 12px; color: #6B6B68; font-size: 14px;
     }
     .spinner {
       width: 24px; height: 24px; border: 2px solid #E0E0E0;
@@ -85,7 +85,7 @@ import { ToastService } from '../../services/toast.service';
     }
     .action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
     .action-btn.secondary { background: #F7F7F5; color: #0D0D0D; }
-    .action-btn.primary { background: #1D9E75; color: #fff; }
+    .action-btn.primary { background: #0F6E56; color: #fff; }
     @media (min-width: 600px) {
       .modal { max-width: 560px; }
     }

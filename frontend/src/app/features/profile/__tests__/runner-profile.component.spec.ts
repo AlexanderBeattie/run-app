@@ -36,7 +36,16 @@ const makeOrganizerAuth = () => ({
 const makeRunsService = (joinedRuns = [makeRun()]) => ({
   getJoinedRuns: jest.fn().mockReturnValue(of(joinedRuns)),
   getMyRuns: jest.fn().mockReturnValue(of([])),
-  getUserProfile: jest.fn().mockReturnValue(of({ id: 'u1', display_name: 'Alex Beattie', total_runs: 1, total_distance_km: 5, favorite_pace: null, verified_pace: 320, recent_runs: [] }))
+  getUserProfile: jest.fn().mockReturnValue(of({ id: 'u1', display_name: 'Alex Beattie', total_runs: 1, total_distance_km: 5, favorite_pace: null, verified_pace: 320, recent_runs: [] })),
+  mapRun: jest.fn((r: any) => ({
+    id: r.id, title: r.title, clubName: r.club_name,
+    distanceKm: parseFloat(r.distance_km) || 0,
+    date: new Date(r.event_date),
+    attendees: [], startLocation: { lat: 0, lng: 0 }, endLocation: { lat: 0, lng: 0 },
+    pace: null, runType: null, tags: [], maxAttendees: null
+  })),
+  toggleJoin: jest.fn(),
+  formatTime: jest.fn().mockReturnValue('9:00am')
 });
 
 async function setup(authService: any, runsService: any) {
@@ -98,29 +107,13 @@ describe('RunnerProfileComponent', () => {
     });
 
     it('totalKm sums distances across all joined runs', () => {
-      component.runs = [makeRun({ distance_km: '5' }), makeRun({ id: 'r2', distance_km: '8.5' })];
+      component.runs = [{ distanceKm: 5, attendees: [] } as any, { distanceKm: 8.5, attendees: [] } as any];
       expect(component.totalKm).toBe(14);
     });
 
     it('totalKm returns 0 when no runs', () => {
       component.runs = [];
       expect(component.totalKm).toBe(0);
-    });
-
-    it('formatDate returns Past for dates in the past', () => {
-      const past = new Date(Date.now() - 86400000).toISOString();
-      expect(component.formatDate(past)).toBe('Past');
-    });
-
-    it('formatDate returns Tomorrow for tomorrow', () => {
-      const tomorrow = new Date(Date.now() + 86400000).toISOString();
-      expect(component.formatDate(tomorrow)).toBe('Tomorrow');
-    });
-
-    it('formatDate returns formatted date for future dates beyond tomorrow', () => {
-      const future = new Date(Date.now() + 86400000 * 5).toISOString();
-      const result = component.formatDate(future);
-      expect(result).toMatch(/\w{3},?\s+\d+\s+\w+/);
     });
 
     it('fetches verified_pace from user profile', () => {
@@ -145,6 +138,94 @@ describe('RunnerProfileComponent', () => {
       const { component: c } = await setup(makeRunnerAuth(), svc);
       expect(c.runs).toEqual([]);
       expect(c.loaded).toBe(true);
+    });
+  });
+
+  describe('upcoming / past run filtering', () => {
+    it('upcomingRuns returns runs with date in the future', async () => {
+      const future = makeRun({ id: 'f1', event_date: new Date(Date.now() + 86400000 * 3).toISOString() });
+      const past = makeRun({ id: 'p1', event_date: new Date(Date.now() - 86400000 * 3).toISOString() });
+      const svc = makeRunsService([future, past]);
+      const { component } = await setup(makeRunnerAuth(), svc);
+      expect(component.upcomingRuns.map(r => r.id)).toContain('f1');
+      expect(component.upcomingRuns.map(r => r.id)).not.toContain('p1');
+    });
+
+    it('pastRuns returns runs with date in the past', async () => {
+      const future = makeRun({ id: 'f1', event_date: new Date(Date.now() + 86400000 * 3).toISOString() });
+      const past = makeRun({ id: 'p1', event_date: new Date(Date.now() - 86400000 * 3).toISOString() });
+      const svc = makeRunsService([future, past]);
+      const { component } = await setup(makeRunnerAuth(), svc);
+      expect(component.pastRuns.map(r => r.id)).toContain('p1');
+      expect(component.pastRuns.map(r => r.id)).not.toContain('f1');
+    });
+
+    it('upcomingRuns is empty when all runs are in the past', async () => {
+      const past1 = makeRun({ id: 'p1', event_date: new Date(Date.now() - 86400000).toISOString() });
+      const past2 = makeRun({ id: 'p2', event_date: new Date(Date.now() - 172800000).toISOString() });
+      const svc = makeRunsService([past1, past2]);
+      const { component } = await setup(makeRunnerAuth(), svc);
+      expect(component.upcomingRuns).toHaveLength(0);
+      expect(component.pastRuns).toHaveLength(2);
+    });
+
+    it('pastRuns is empty when all runs are in the future', async () => {
+      const f1 = makeRun({ id: 'f1', event_date: new Date(Date.now() + 86400000).toISOString() });
+      const f2 = makeRun({ id: 'f2', event_date: new Date(Date.now() + 172800000).toISOString() });
+      const svc = makeRunsService([f1, f2]);
+      const { component } = await setup(makeRunnerAuth(), svc);
+      expect(component.pastRuns).toHaveLength(0);
+      expect(component.upcomingRuns).toHaveLength(2);
+    });
+  });
+
+  describe('tab switching', () => {
+    it('starts on the upcoming tab', async () => {
+      const { component } = await setup(makeRunnerAuth(), makeRunsService());
+      expect(component.activeTab()).toBe('upcoming');
+    });
+
+    it('switching to past tab updates activeTab signal', async () => {
+      const { component, fixture } = await setup(makeRunnerAuth(), makeRunsService());
+      component.activeTab.set('past');
+      fixture.detectChanges();
+      expect(component.activeTab()).toBe('past');
+    });
+
+    it('shows upcoming empty state when upcoming tab selected and no upcoming runs', async () => {
+      const past = makeRun({ id: 'p1', event_date: new Date(Date.now() - 86400000 * 5).toISOString() });
+      const svc = makeRunsService([past]);
+      const { fixture } = await setup(makeRunnerAuth(), svc);
+      const text = fixture.nativeElement.textContent;
+      expect(text).toContain('No upcoming runs');
+    });
+
+    it('shows past empty state when past tab selected and no past runs', async () => {
+      const future = makeRun({ id: 'f1', event_date: new Date(Date.now() + 86400000 * 5).toISOString() });
+      const svc = makeRunsService([future]);
+      const { component, fixture } = await setup(makeRunnerAuth(), svc);
+      component.activeTab.set('past');
+      fixture.detectChanges();
+      const text = fixture.nativeElement.textContent;
+      expect(text).toContain('No past runs');
+    });
+  });
+
+  describe('error handling', () => {
+    it('sets errorMessage when getJoinedRuns fails', async () => {
+      const failSvc = { ...makeRunsService(), getJoinedRuns: jest.fn().mockReturnValue(throwError(() => new Error('Network error'))) };
+      const { component } = await setup(makeRunnerAuth(), failSvc);
+      expect(component.errorMessage()).toBeTruthy();
+    });
+
+    it('clears errorMessage when close button clicked', async () => {
+      const failSvc = { ...makeRunsService(), getJoinedRuns: jest.fn().mockReturnValue(throwError(() => new Error('err'))) };
+      const { component, fixture } = await setup(makeRunnerAuth(), failSvc);
+      const closeBtn = fixture.nativeElement.querySelector('.error-close');
+      expect(closeBtn).not.toBeNull();
+      closeBtn.click();
+      fixture.detectChanges();
+      expect(component.errorMessage()).toBeNull();
     });
   });
 

@@ -19,8 +19,17 @@ import { ToastService } from '../../services/toast.service';
     </div>
   `,
     styles: [`
-    .toast-stack { position: fixed; top: 16px; left: 16px; right: 16px; z-index: 1000; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
-    .toast { pointer-events: auto; display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-radius: 12px; font-size: 14px; font-weight: 500; cursor: pointer; animation: slideIn 0.25s ease; box-shadow: 0 4px 16px rgba(0,0,0,0.12); }
+    .toast-stack {
+      position: fixed; top: max(16px, env(safe-area-inset-top)); left: 16px; right: 16px;
+      z-index: 1000; display: flex; flex-direction: column; gap: 8px; pointer-events: none;
+      max-width: 560px; margin: 0 auto;
+    }
+    .toast {
+      pointer-events: auto; display: flex; align-items: center; gap: 10px;
+      padding: 14px 16px; border-radius: 14px; font-size: 14px; font-weight: 500;
+      cursor: pointer; animation: slideIn 0.3s var(--ease-out, ease-out);
+      box-shadow: var(--shadow-overlay, 0 8px 32px rgba(13,13,12,0.16));
+    }
     .toast.success { background: #0F6E56; color: #E1F5EE; }
     .toast.error { background: #A32D2D; color: #FCEBEB; }
     .toast.info { background: #0D0D0D; color: #fff; }

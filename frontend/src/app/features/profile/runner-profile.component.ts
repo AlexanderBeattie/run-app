@@ -4,23 +4,44 @@ import { AuthService } from '../../core/services/auth.service';
 import { Router, ActivatedRoute } from '@angular/router';
 import { OrganiserHomeComponent } from '../clubs/organiser-home.component';
 import { RunDetailDialogComponent } from '../../shared/components/run-detail-dialog/run-detail-dialog.component';
+import { RunCardComponent } from '../../shared/components/run-card/run-card.component';
+import { RoutePreviewComponent } from '../../shared/components/route-preview/route-preview.component';
+import { SettingsMenuComponent } from '../../shared/components/settings-menu/settings-menu.component';
 import { RunEvent } from '../../core/models/run-event.model';
 import { environment } from '../../../environments/environment';
 
 @Component({
   selector: 'app-runner-profile',
   standalone: true,
-  imports: [OrganiserHomeComponent, RunDetailDialogComponent],
+  imports: [OrganiserHomeComponent, RunDetailDialogComponent, RunCardComponent, RoutePreviewComponent, SettingsMenuComponent],
   template: `
     <div class="page">
-      <div class="profile-header">
-        <div class="avatar">{{ initials }}</div>
-        <div class="info">
-          <div class="name">{{ auth.getUser()()?.displayName }}</div>
-          <div class="role">{{ auth.isOrganizer() ? 'Organiser' : 'Runner' }}</div>
+
+      <!-- Hero Header -->
+      <div class="hero-card">
+        <button class="settings-btn" (click)="showSettings.set(true)" aria-label="Open settings">⚙</button>
+        <div class="hero-avatar">{{ initials }}</div>
+        <div class="hero-name">{{ auth.getUser()()?.displayName }}</div>
+        <div class="role">{{ auth.isOrganizer() ? 'Organiser' : 'Runner' }}</div>
+        <div class="hero-stats">
+          <div class="hero-stat">
+            <div class="hero-sv">{{ runs.length }}</div>
+            <div class="hero-sl">Runs</div>
+          </div>
+          <div class="hero-divider"></div>
+          <div class="hero-stat">
+            <div class="hero-sv">{{ totalKm }}k</div>
+            <div class="hero-sl">Distance</div>
+          </div>
+          <div class="hero-divider"></div>
+          <div class="hero-stat">
+            <div class="hero-sv">{{ verifiedPace() !== null ? formatPace(verifiedPace()!) : '—' }}</div>
+            <div class="hero-sl">Pace</div>
+          </div>
         </div>
-        <button class="logout" (click)="logout()">Log out</button>
       </div>
+
+      <!-- Organiser mode toggle -->
 
       @if (auth.isOrganizer()) {
         <div class="toggle-wrap">
@@ -31,70 +52,71 @@ import { environment } from '../../../environments/environment';
         </div>
       }
 
+      <!-- Runner view -->
       @if (viewMode() === 'runner') {
         <div class="runner-view">
-          <div class="stats-row">
-            <div class="stat"><div class="sv">{{ runs.length }}</div><div class="sl">runs joined</div></div>
-            <div class="stat"><div class="sv">{{ totalKm }}k</div><div class="sl">total distance</div></div>
-            @if (verifiedPace() !== null) {
-              <div class="stat"><div class="sv">{{ formatPace(verifiedPace()!) }}</div><div class="sl">verified pace</div></div>
-            }
-          </div>
 
-          <div class="strava-section">
-            @if (auth.getUser()()?.stravaConnected) {
-              <div class="strava-connected">
-                <svg class="strava-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169" fill="#FC4C02"/></svg>
-                <span class="strava-label">Connected to Strava</span>
-                <span class="strava-check">✓</span>
-              </div>
-            } @else {
-              <button class="strava-btn" (click)="connectStrava()" aria-label="Connect with Strava">
-                <svg class="strava-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169" fill="#fff"/></svg>
-                Connect with Strava
-              </button>
-            }
+        <!-- Segmented tabs -->
+        <div class="tabs-container">
+          <div class="tab-track">
+            <div class="tab-slider" [class.right]="activeTab() === 'past'"></div>
+            <button class="tab-btn" [class.active]="activeTab() === 'upcoming'" (click)="activeTab.set('upcoming')">Upcoming</button>
+            <button class="tab-btn" [class.active]="activeTab() === 'past'" (click)="activeTab.set('past')">Past</button>
           </div>
+        </div>
 
-          @if (errorMessage()) {
-            <div class="error-banner">
-              <div class="error-icon">⚠</div>
-              <div>
-                <div class="error-title">Unable to load runs</div>
-                <div class="error-text">{{ errorMessage() }}</div>
-              </div>
-              <button class="error-close" (click)="errorMessage.set(null)">×</button>
+        @if (errorMessage()) {
+          <div class="error-banner">
+            <div class="error-icon">⚠</div>
+            <div>
+              <div class="error-title">Unable to load runs</div>
+              <div class="error-text">{{ errorMessage() }}</div>
             </div>
-          }
+            <button class="error-close" (click)="errorMessage.set(null)">×</button>
+          </div>
+        }
 
-          <div class="section-title">Your upcoming runs</div>
-
-          @if (!loaded) {
-            <div class="empty">Loading...</div>
-          } @else if (runs.length === 0) {
-            <div class="empty">No runs yet. Find one on the map!</div>
-          } @else {
-            <div class="list">
-              @for (run of runs; track run.id) {
-                <div class="run-item" (click)="openDialog(run)" style="cursor:pointer">
-                  <div class="run-left">
-                    @if (run.club_name) { <div class="run-club">{{ run.club_name }}</div> }
-                    <div class="run-title">{{ run.title }}</div>
-                    <div class="run-meta">{{ formatDate(run.event_date) }} · {{ run.distance_km }}k</div>
-                  </div>
-                  <div class="run-badge">{{ run.distance_km }}k</div>
-                </div>
+        @if (!loaded) {
+          <div class="empty">Loading...</div>
+        } @else {
+          <div class="list">
+            @if (activeTab() === 'upcoming') {
+              @if (upcomingRuns.length === 0) {
+                <div class="empty">No upcoming runs. Find one on the map!</div>
+              } @else {
+                @for (run of upcomingRuns; track run.id) {
+                  <app-run-card [run]="run" [isJoined]="true"
+                    (cardClick)="openDialog($event)"
+                    (joinToggle)="onJoin($event)" />
+                }
               }
-            </div>
-          }
+            } @else {
+              @if (pastRuns.length === 0) {
+                <div class="empty">No past runs yet.</div>
+              } @else {
+                @for (run of pastRuns; track run.id) {
+                  <app-run-card [run]="run" [isJoined]="true"
+                    (cardClick)="openDialog($event)"
+                    (joinToggle)="onJoin($event)" />
+                  @if (run.strava_polyline) {
+                    <app-route-preview [polyline]="run.strava_polyline" />
+                  }
+                }
+              }
+            }
+          </div>
+        }
         </div>
       }
 
+      <!-- Organiser view -->
       @if (viewMode() === 'organiser') {
         <app-organiser-home [embedded]="true" />
       }
+
     </div>
 
+    <!-- Run detail dialog -->
     @if (selectedRun()) {
       <app-run-detail-dialog
         [run]="selectedRun()!"
@@ -102,55 +124,100 @@ import { environment } from '../../../environments/environment';
         (close)="selectedRun.set(null)"
         (join)="onJoin($event)" />
     }
+
+    <!-- Settings bottom sheet -->
+    @if (showSettings()) {
+      <app-settings-menu
+        [stravaConnected]="auth.getUser()()?.stravaConnected ?? false"
+        (close)="showSettings.set(false)"
+        (logout)="onLogout()"
+        (connectStrava)="connectStrava()" />
+    }
   `,
   styles: [`
-    .page { padding: 0 0 24px; background: #F7F7F5; min-height: 100%; overflow-x: hidden; }
-    .profile-header { background: #0D0D0D; padding: 16px 16px 20px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-    .avatar { width: 48px; height: 48px; border-radius: 50%; background: #E1F5EE; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 500; color: #0F6E56; flex-shrink: 0; }
-    .info { flex: 1; min-width: 0; }
-    .name { font-size: 15px; font-weight: 500; color: #fff; margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .role { font-size: 12px; color: rgba(255,255,255,0.5); }
-    .logout { background: rgba(255,255,255,0.08); border: none; color: rgba(255,255,255,0.6); border-radius: 8px; padding: 6px 10px; font-size: 12px; cursor: pointer; font-family: inherit; flex-shrink: 0; white-space: nowrap; }
+    .page { padding-bottom: 24px; background: #F7F7F5; min-height: 100%; overflow-x: hidden; }
+
+    /* ── Hero ──────────────────────────────────────────────────── */
+    .hero-card {
+      position: relative;
+      background: #0D0D0D;
+      background-image: radial-gradient(ellipse at 50% 0%, rgba(29,158,117,0.18) 0%, transparent 65%);
+      padding: 52px 20px 24px;
+      text-align: center;
+    }
+    .settings-btn {
+      position: absolute; top: 16px; right: 16px;
+      width: 44px; height: 44px;
+      background: rgba(255,255,255,0.1); border: none; border-radius: 50%;
+      color: rgba(255,255,255,0.7); font-size: 18px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-family: inherit;
+    }
+    .settings-btn:active { background: rgba(255,255,255,0.18); }
+
+    .hero-avatar {
+      width: 64px; height: 64px; border-radius: 50%;
+      background: rgba(29,158,117,0.2); border: 1.5px solid rgba(29,158,117,0.45);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px; font-weight: 600; color: #4adebc;
+      margin: 0 auto 12px;
+    }
+    .hero-name { font-size: 20px; font-weight: 600; color: #fff; margin-bottom: 4px; }
+    .role { font-size: 13px; color: rgba(255,255,255,0.6); margin-bottom: 24px; }
+
+    .hero-stats {
+      display: flex; align-items: stretch;
+      background: rgba(255,255,255,0.07); border-radius: 14px; overflow: hidden;
+    }
+    .hero-stat { flex: 1; padding: 14px 8px; text-align: center; }
+    .hero-sv { font-size: 18px; font-weight: 600; color: #fff; }
+    .hero-sl { font-size: 10px; color: rgba(255,255,255,0.6); margin-top: 3px; text-transform: uppercase; letter-spacing: 0.05em; }
+    .hero-divider { width: 0.5px; background: rgba(255,255,255,0.1); margin: 10px 0; flex-shrink: 0; }
 
     /* ── Mode toggle ─────────────────────────────────────────── */
     .toggle-wrap { background: #0D0D0D; padding: 0 16px 16px; }
     .mode-toggle { display: flex; background: rgba(255,255,255,0.12); border-radius: 999px; padding: 3px; gap: 2px; }
-    .mode-btn { flex: 1; padding: 8px 0; border: none; border-radius: 999px; background: transparent; color: rgba(255,255,255,0.5); font-size: 13px; font-weight: 500; cursor: pointer; font-family: inherit; transition: background 0.18s, color 0.18s; }
+    .mode-btn { flex: 1; min-height: 44px; border: none; border-radius: 999px; background: transparent; color: rgba(255,255,255,0.5); font-size: 13px; font-weight: 500; cursor: pointer; font-family: inherit; transition: background 0.18s, color 0.18s; }
     .mode-btn.active { background: #fff; color: #0D0D0D; }
 
-    /* ── Runner view ─────────────────────────────────────────── */
-    .stats-row { display: flex; padding: 14px 12px 8px; gap: 10px; }
-    .stat { flex: 1; background: #fff; border: 0.5px solid rgba(0,0,0,0.08); border-radius: 12px; padding: 12px; text-align: center; }
-    .sv { font-size: 18px; font-weight: 500; color: #0D0D0D; }
-    .sl { font-size: 10px; color: #9B9B98; margin-top: 2px; }
+    /* ── Segmented tabs ──────────────────────────────────────── */
+    .tabs-container { padding: 16px 16px 0; }
+    .tab-track {
+      position: relative;
+      display: flex;
+      background: #F0F0F0; border-radius: 999px; padding: 3px;
+    }
+    .tab-slider {
+      position: absolute; top: 3px; bottom: 3px;
+      left: 3px; width: calc(50% - 3px);
+      background: #fff; border-radius: 999px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+      transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      will-change: transform;
+    }
+    .tab-slider.right { transform: translateX(100%); }
+    .tab-btn {
+      flex: 1; min-height: 44px; border: none; background: transparent;
+      border-radius: 999px; z-index: 1;
+      font-size: 14px; font-weight: 500; color: #6B6B68;
+      cursor: pointer; font-family: inherit; transition: color 0.18s;
+    }
+    .tab-btn.active { color: #0D0D0D; }
 
+    /* ── Run list ────────────────────────────────────────────── */
+    .list { display: flex; flex-direction: column; gap: 12px; padding: 16px 12px; }
+    .empty { text-align: center; padding: 40px 16px; font-size: 14px; color: #6B6B68; }
+
+    /* ── Error ───────────────────────────────────────────────── */
     .error-banner {
       display: flex; align-items: flex-start; gap: 12px;
-      margin: 14px 16px 12px 16px;
+      margin: 14px 16px 0;
       background: #FCEBEB; border: 1px solid #E89999; border-radius: 12px; padding: 12px 14px;
     }
     .error-icon { font-size: 18px; flex-shrink: 0; }
     .error-title { font-size: 14px; font-weight: 600; color: #A32D2D; margin-bottom: 2px; }
     .error-text { font-size: 13px; color: #8B2828; }
     .error-close { background: none; border: none; color: #A32D2D; cursor: pointer; font-size: 20px; padding: 0; margin-left: auto; flex-shrink: 0; }
-
-    .strava-section { padding: 0 12px 12px; }
-    .strava-btn { display: flex; align-items: center; gap: 8px; width: 100%; background: #FC4C02; border: none; border-radius: 12px; padding: 13px 16px; color: #fff; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; justify-content: center; }
-    .strava-btn:hover { background: #e04400; }
-    .strava-btn:focus-visible { outline: 2px solid #FC4C02; outline-offset: 2px; }
-    .strava-connected { display: flex; align-items: center; gap: 8px; background: #fff; border: 0.5px solid rgba(0,0,0,0.08); border-radius: 12px; padding: 13px 16px; }
-    .strava-label { font-size: 14px; font-weight: 500; color: #0D0D0D; flex: 1; }
-    .strava-check { font-size: 14px; color: #1D9E75; font-weight: 600; }
-    .strava-icon { width: 20px; height: 20px; flex-shrink: 0; }
-    .section-title { font-size: 11px; font-weight: 500; color: #9B9B98; text-transform: uppercase; letter-spacing: 0.06em; padding: 14px 14px 10px; }
-    .empty { text-align: center; padding: 40px 16px; font-size: 14px; color: #9B9B98; }
-    .list { display: flex; flex-direction: column; gap: 2px; padding: 0 12px; }
-    .run-item { display: flex; justify-content: space-between; align-items: center; gap: 10px; background: #fff; border: 0.5px solid rgba(0,0,0,0.08); border-radius: 12px; padding: 12px; min-width: 0; }
-    .run-left { flex: 1; min-width: 0; }
-    .run-club { font-size: 11px; color: #1D9E75; font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 2px; }
-    .run-title { font-size: 13px; font-weight: 500; color: #0D0D0D; margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .run-meta { font-size: 12px; color: #6B6B68; }
-    .run-badge { background: #E1F5EE; color: #0F6E56; border-radius: 999px; padding: 4px 10px; font-size: 11px; font-weight: 500; flex-shrink: 0; }
   `]
 })
 export class RunnerProfileComponent implements OnInit {
@@ -160,23 +227,41 @@ export class RunnerProfileComponent implements OnInit {
   route = inject(ActivatedRoute);
   cdr = inject(ChangeDetectorRef);
 
-  runs: any[] = [];
+  runs: RunEvent[] = [];
   loaded = false;
   errorMessage = signal<string | null>(null);
   viewMode = signal<'runner' | 'organiser'>('runner');
   verifiedPace = signal<number | null>(null);
   selectedRun = signal<RunEvent | null>(null);
+  showSettings = signal(false);
+  activeTab = signal<'upcoming' | 'past'>('upcoming');
 
-  get initials() { return (this.auth.getUser()()?.displayName ?? '').split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0,2); }
-  get totalKm() { return Math.round(this.runs.reduce((acc, r) => acc + parseFloat(r.distance_km), 0)); }
+  get initials(): string {
+    return (this.auth.getUser()()?.displayName ?? '')
+      .split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
+  }
 
-  connectStrava() {
+  get totalKm(): number {
+    return Math.round(this.runs.reduce((acc, r) => acc + (r.distanceKm ?? 0), 0));
+  }
+
+  get upcomingRuns(): RunEvent[] {
+    const now = new Date();
+    return this.runs.filter(r => r.date >= now);
+  }
+
+  get pastRuns(): RunEvent[] {
+    const now = new Date();
+    return this.runs.filter(r => r.date < now);
+  }
+
+  connectStrava(): void {
     const token = this.auth.getToken();
     if (!token) return;
     window.location.href = `${environment.apiUrl}/auth/strava?token=${encodeURIComponent(token)}`;
   }
 
-  ngOnInit() {
+  ngOnInit(): void {
     if (this.route.snapshot.queryParamMap.get('strava') === 'connected') {
       this.auth.setStravaConnected();
       this.router.navigate([], { replaceUrl: true, queryParams: {} });
@@ -184,7 +269,7 @@ export class RunnerProfileComponent implements OnInit {
 
     this.svc.getJoinedRuns().subscribe({
       next: (data) => {
-        this.runs = data;
+        this.runs = data.map((r: any) => this.svc.mapRun(r));
         this.loaded = true;
         this.errorMessage.set(null);
         this.cdr.markForCheck();
@@ -208,26 +293,21 @@ export class RunnerProfileComponent implements OnInit {
     }
   }
 
-  formatDate(date: string) {
-    const d = new Date(date);
-    const diff = d.getTime() - Date.now();
-    const days = Math.floor(diff / 86400000);
-    if (days <= 0) return 'Past';
-    if (days === 1) return 'Tomorrow';
-    return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
-  }
-
   formatPace(secondsPerKm: number): string {
     const mins = Math.floor(secondsPerKm / 60);
     const secs = Math.round(secondsPerKm % 60);
     return `${mins}:${secs.toString().padStart(2, '0')}/k`;
   }
 
-  openDialog(run: any) { this.selectedRun.set(this.svc.mapRun(run)); }
+  openDialog(run: RunEvent): void { this.selectedRun.set(run); }
 
-  onJoin(runId: string) {
+  onJoin(runId: string): void {
     this.svc.toggleJoin(runId, this.auth.getUser()()?.id ?? 'guest');
   }
 
-  logout() { this.auth.logout(); this.router.navigate(['/login']); }
+  onLogout(): void {
+    this.showSettings.set(false);
+    this.auth.logout();
+    this.router.navigate(['/login']);
+  }
 }

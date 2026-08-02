@@ -1,89 +1,61 @@
 # KLUB — Task Queue
 
-## Status: Phase 6a — Strava Integration Sprint
-
-> Full post-launch roadmap → `tasks/roadmap.md` (not loaded automatically)
-
----
-
-## Active Sprint: Phase 6a — Strava Integration
-
-### 1. Database Schema & Migrations
-> Context: `backend/src/db/` (new migration file) + `schema.sql`
-- [x] Create `migration-005.sql` to add Strava columns to `users`: `strava_athlete_id` (BIGINT), `strava_access_token` (TEXT), `strava_refresh_token` (TEXT), `strava_token_expires_at` (BIGINT).
-- [x] Add Strava columns to `run_attendees`: `strava_activity_id` (BIGINT), `strava_distance` (FLOAT), `strava_moving_time` (INT), `strava_average_speed` (FLOAT), `strava_polyline` (TEXT).
-- [x] Update `schema.sql` to reflect these new columns.
-- [x] **Continuation:** Create a dedicated `strava_webhooks` table to handle future automated activity syncing via Strava's Webhook API.
-
-### 2. OAuth 2.0 Flow (Backend)
-> Context: `auth.routes.ts` + `users.routes.ts`
-- [x] Add `STRAVA_CLIENT_ID` and `STRAVA_CLIENT_SECRET` to `.env.example` and backend config.
-- [x] Create `GET /api/auth/strava` which redirects the user to Strava's OAuth authorize URL requesting `activity:read` scope.
-- [x] Create `GET /api/auth/strava/callback` to handle the return redirect, exchange the `code` for tokens via `POST https://www.strava.com/api/v3/oauth/token`, and save them to the authenticated user's DB record.
-- [ ] **Continuation:** Implement a token-refresh middleware that automatically refreshes the `strava_access_token` if `strava_token_expires_at` has passed.
-
-### 3. Connect Strava UI (Frontend)
-> Context: `runner-profile.component.ts` (or settings view) + `auth.service.ts`
-- [x] Add a "Connect with Strava" button (using official Strava branding/orange `#FC4C02`).
-- [x] Wire the button to hit the new `GET /api/auth/strava` endpoint.
-- [x] Display a "Connected to Strava" success state if the current user profile has a `strava_athlete_id`.
-- [ ] **Continuation:** Add a "Disconnect Strava" button that clears the tokens from the DB and revokes access via Strava's deauthorization endpoint.
-
-### 4. Fetch & Link Activities (Full-Stack)
-> Context: `runs.routes.ts` + `run-detail-dialog.component.ts` + new `strava-selector-modal.component.ts`
-- [x] **Backend:** Create `GET /api/users/strava/activities` that proxies to `https://www.strava.com/api/v3/athlete/activities?per_page=10` using the user's stored token. Filter for `type === 'Run' || type === 'TrailRun'`.
-- [x] **Backend:** Create `POST /api/runs/:id/link-strava` to save the selected `activity_id` and stats (`distance`, `moving_time`, `average_speed`, `map.summary_polyline`) to the user's `run_attendees` row.
-- [x] **Frontend:** In `run-detail-dialog`, if the run is in the past and the user attended, show a "Link Strava Run" button.
-- [x] **Frontend:** Build a modal that fetches and lists the recent Strava runs. Clicking one saves the link via the new POST endpoint.
-- [ ] **Continuation:** Auto-suggest the correct Strava run by comparing the KLUB `event_date` to the Strava `start_date_local`.
-
-### 5. Verified Profile Stats (Frontend)
-> Context: `runner-profile-dialog.component.ts` + `users.routes.ts`
-- [x] **Backend:** Update the `GET /api/users/:id/profile` endpoint. If the user has linked Strava runs, calculate their true average pace (`(1000 / average_speed) / 60`) from the `run_attendees` data and pass it as `verified_pace`.
-- [x] **Frontend:** Update the profile card to display the "Verified Pace" with an orange Strava verification checkmark.
-- [x] **Frontend:** In the "Recent Runs" list, add a small Strava icon next to runs that have linked data.
-- [ ] **Continuation:** Display the linked Strava polyline snippet as a tiny background graphic on the recent run list items.
+**Current Focus:** Phase 6a/b — Strava Closure & Social Kickoff
+**Sprint Goal:** Finalize the Strava loop and transition KLUB from Utility to Community.
 
 ---
 
-## Completed
+## 🚨 Market Research Inserts (April 2026)
+*Two gaps identified by competitive analysis that warrant immediate action — see `tasks/roadmap.md` for full context.*
 
-### Phase 4d — High-Impact UX Sprint
-- [x] Club Search & Filter (client-side matching name, city, pace, tags)
-- [x] Social Proof Badges (live attendee counts, verified club checkmarks)
-- [x] Run Detail Upgrades (kit checklists, next run by club footer)
-- [x] Post-Run Share Card (Canvas API image generation, Web Share API integration)
-- [x] Geo-Filter (navigator.geolocation + Haversine distance sorting)
-- [x] Runner Profile Cards (clickable avatars, profile API endpoint, polished modal)
+### 0. Week-1 Onboarding Funnel (Highest Retention Leverage)
+> Retention data: users active in week 1 are 80% more likely to stay 6+ months. A new user who can't find a run near them in <60 seconds will churn. This is the biggest immediate retention risk.
+- [ ] **Location-Aware Welcome:** Post-signup screen that uses geolocation to surface the nearest 3 upcoming runs immediately.
+- [ ] **"Your First Run" CTA:** Persistent prompt on home feed for users with 0 joined runs — dismisses permanently once they join one.
+- [ ] **Empty State Fix:** Replace empty feed state (no runs in area) with a "Notify me when a run is posted near [city]" subscription prompt.
 
-### Phase 4c — Visual Enhancement Sprint
-- [x] Pace + tags on create-run form
-- [x] Standardise club pace field format to labels
-- [x] Pace-aware estimated duration on create-run form
-- [x] Pace hint label on create-run form
-- [x] Fix map zoom button hidden behind runs drawer
-- [x] Verify organiser dashboard active / past run filtering
-- [x] Inclusivity and accessibility improvements
-- [x] Run card & detail dialog visual polish
-- [x] Onboarding flow (3-screen wizard with localStorage)
-- [x] "Open in Maps" + meeting point UX
-- [x] Home feed filter pills
-- [x] Featured clubs section on home
+---
 
-### Phase 4b — Run Card & UX Polish
-- [x] Seed data (Glasgow-based runs)
-- [x] Route art (dynamic SVG elevation)
+## 🟢 Active Sprint: Strava Completion & Home Polish
 
-### Phase 4 — Deployment Readiness
-- [x] Security hardening (backend rate limiting, JWT expiry, refresh tokens)
-- [x] Security hardening (frontend AuthService interceptors)
-- [x] Password reset (Forgot/Reset password flow)
-- [x] Maps API updates (AdvancedMarkerElement)
-- [x] DB schema consolidated (schema.sql canonical)
-- [x] Seed script initialized
+### 1. Strava Integration (Closure)
+- [ ] **Disconnect Strava:** Create `DELETE /api/auth/strava` (backend) to wipe tokens/athlete_id and a "Disconnect" UI in Runner Settings.
+- [ ] **Auto-Suggest Matching:** Implement date-range matching logic in `StravaSelectorModal` to highlight the most likely Strava activity for a KLUB run.
+- [ ] **Webhook Infrastructure:** Implement the listener for Strava Webhooks to automatically sync "Linked" activities when they are updated on Strava.
 
-### Phase A1 — Ahead of schedule
-- [x] run_type end-to-end (enums, badges, filters)
+### 2. Home Feed "Pro" Visuals
+- [ ] **Route Art Elevation:** Move the `RoutePreviewComponent` onto Home Feed cards. If a run has an associated route, show the SVG "fingerprint" on the card.
+- [ ] **Global Search Optimization:** Add a PostgreSQL GIN index to `run_events` (title, description) and `clubs` (name) for faster full-text search.
 
-### Phases 1–3
-- [x] Core feature set, maps, geocoding, test coverage, discovery feed.
+---
+
+## 🟠 Next Up: The Social Epic (Phase 6b)
+
+### 3. Run Chat (High Priority)
+> Market validated: post-run coordination is the #1 unmet social need across all major competitors. Strava clubs are forums; nobody owns in-run logistics chat.
+- [ ] **Database:** Create `run_comments` table (id, run_id, user_id, content, created_at).
+- [ ] **Backend:** `GET /api/runs/:id/comments` and `POST /api/runs/:id/comments`.
+- [ ] **UI:** Chat tab in `RunDetailDialog` with bottom-anchored input bar and signal-based message updates.
+
+### 4. Pace-Based Runner Matching (New — Market Gap)
+> The most-cited unmet need across Reddit, App Store reviews, and competitor analysis. Current pace filter is an event filter; users want person-level discovery ("who near me runs at my pace?").
+- [ ] **Profile Pace Field:** Add `preferred_pace_min_km` to user profiles (set during onboarding or in settings).
+- [ ] **Backend Query:** `GET /api/runs?pace_match=true` — ranks/filters runs where the posted pace overlaps the requesting user's preferred pace (±30 sec/km window).
+- [ ] **UI:** "Runs for you" section on Home Feed — a curated row of pace-matched runs above the main feed, distinct from the search filters.
+
+---
+
+## 🛡 Verification & Maintenance
+- [ ] **Error Boundaries:** Implement a global Angular ErrorHandler to catch runtime crashes and show a user-friendly Toast.
+- [ ] **API Key Hardening:** Restrict Google Maps API keys to production domain referrers in Google Cloud Console.
+- [ ] **Cleanup Job:** Schedule a daily cron on Render to delete expired refresh tokens from the DB.
+
+---
+
+## ✅ Recently Completed (The "Unbreakable" Sprint)
+- [x] **AES-256 Encryption:** All Strava tokens encrypted at rest in DB.
+- [x] **Proactive Refresh:** Automatic Strava token refresh logic (5-min buffer).
+- [x] **Advanced Markers:** Full migration to `AdvancedMarkerElement` (2026 Maps API compliant).
+- [x] **Image Compression:** Frontend Canvas-based compression to stay under 1GB DB limit.
+- [x] **Dormant Data Activation:** Weather Badges, GPS Polylines, and "Spots Left" logic fully wired to UI.
+- [x] **Tag Filtering:** Interactive tag pills on Home Feed.
