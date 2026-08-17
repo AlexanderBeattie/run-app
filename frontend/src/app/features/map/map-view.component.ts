@@ -6,7 +6,7 @@ import { ToastService } from '../../shared/services/toast.service';
 import { RunDetailDialogComponent } from '../../shared/components/run-detail-dialog/run-detail-dialog.component';
 import { RunCardCarouselComponent } from '../../shared/components/run-card-carousel/run-card-carousel.component';
 import { RunEvent } from '../../core/models/run-event.model';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { environment } from '../../../environments/environment';
 
 declare const google: any;
@@ -92,6 +92,7 @@ export class MapViewComponent implements OnInit, AfterViewInit {
   runsService = inject(RunsService);
   auth = inject(AuthService);
   toast = inject(ToastService);
+  router = inject(Router);
   map: any;
   userMarker: any;
   selectedCarouselId = signal<string | null>(null);
@@ -113,11 +114,17 @@ export class MapViewComponent implements OnInit, AfterViewInit {
 
   ngAfterViewInit(): void {
     if (typeof google !== 'undefined') { this.initMap(); return; }
+    const existing = document.querySelector<HTMLScriptElement>('script[data-klub-maps]');
+    if (existing) {
+      (window as any).__klubMapsReady = () => this.initMap();
+      return;
+    }
+    (window as any).__klubMapsReady = () => this.initMap();
     const s = document.createElement('script');
-    s.src = `https://maps.googleapis.com/maps/api/js?key=${environment.googleMapsApiKey}&libraries=marker`;
+    s.src = `https://maps.googleapis.com/maps/api/js?key=${environment.googleMapsApiKey}&libraries=marker&loading=async&callback=__klubMapsReady`;
     s.async = true;
     s.defer = true;
-    s.onload = () => this.initMap();
+    s.dataset['klubMaps'] = '1';
     document.head.appendChild(s);
   }
 
@@ -131,7 +138,7 @@ export class MapViewComponent implements OnInit, AfterViewInit {
     });
 
     this.addRunMarkers();
-    this.locateUser();
+    this.locateUser(true);
   }
 
   addRunMarkers(): void {
@@ -167,7 +174,9 @@ export class MapViewComponent implements OnInit, AfterViewInit {
     }
   }
 
-  locateUser(): void {
+  // silent: automatic locate on map load — don't toast if the fix fails; the
+  // stored/default centre is already a sensible fallback. Explicit button taps toast.
+  locateUser(silent = false): void {
     if (!navigator.geolocation) return;
     navigator.geolocation.getCurrentPosition(
       (pos) => {
@@ -178,11 +187,11 @@ export class MapViewComponent implements OnInit, AfterViewInit {
         this.setUserMarker(coords);
       },
       (err) => {
-        const msg = err.code === 1
-          ? 'Location blocked. Check your browser permission settings'
-          : 'Could not get your location';
         console.warn('[KLUB] Geolocation error:', err.code, err.message);
-        this.toast.show(msg);
+        if (silent) return;
+        this.toast.show(err.code === 1
+          ? 'Location blocked. Check your browser permission settings'
+          : 'Could not get your location');
       },
       { enableHighAccuracy: true, timeout: 8000 }
     );
@@ -214,8 +223,14 @@ export class MapViewComponent implements OnInit, AfterViewInit {
   }
 
   onJoin(runId: string): void {
+    const user = this.auth.getUser()();
+    if (!user) {
+      this.toast.show('Sign in to join runs');
+      this.router.navigate(['/login'], { queryParams: { returnUrl: '/map' } });
+      return;
+    }
     const wasJoined = this.runsService.getJoinedRunIds()().includes(runId);
-    this.runsService.toggleJoin(runId, this.auth.getUser()()?.id ?? 'guest');
+    this.runsService.toggleJoin(runId, user.id);
     this.toast.show(wasJoined ? 'Left the run' : "You're in!");
   }
 }

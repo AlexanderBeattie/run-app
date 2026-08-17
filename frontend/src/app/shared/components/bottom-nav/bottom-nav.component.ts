@@ -1,5 +1,6 @@
 import { Component, inject } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
+import { AuthService } from '../../../core/services/auth.service';
 
 @Component({
   selector: 'app-bottom-nav',
@@ -38,15 +39,27 @@ import { Router, RouterLink } from '@angular/router';
         <span>Clubs</span>
       </a>
 
-      <a class="nav-item" routerLink="/profile" [class.active]="isActive('/profile')">
-        <div class="icon-wrap" [class.active]="isActive('/profile')">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" [attr.stroke]="isActive('/profile') ? '#fff' : '#6B6B68'" stroke-width="2">
-            <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/>
-            <circle cx="12" cy="7" r="4"/>
-          </svg>
-        </div>
-        <span>Profile</span>
-      </a>
+      @if (auth.isLoggedIn()) {
+        <a class="nav-item" routerLink="/profile" [class.active]="isActive('/profile')">
+          <div class="icon-wrap" [class.active]="isActive('/profile')">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" [attr.stroke]="isActive('/profile') ? '#fff' : '#6B6B68'" stroke-width="2">
+              <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/>
+              <circle cx="12" cy="7" r="4"/>
+            </svg>
+          </div>
+          <span>Profile</span>
+        </a>
+      } @else {
+        <a class="nav-item" routerLink="/login" [class.active]="isActive('/login')">
+          <div class="icon-wrap" [class.active]="isActive('/login')">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" [attr.stroke]="isActive('/login') ? '#fff' : '#6B6B68'" stroke-width="2">
+              <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/>
+              <circle cx="12" cy="7" r="4"/>
+            </svg>
+          </div>
+          <span>Sign in</span>
+        </a>
+      }
     </nav>
   `,
   styles: [`
@@ -81,5 +94,6 @@ import { Router, RouterLink } from '@angular/router';
 })
 export class BottomNavComponent {
   router = inject(Router);
+  auth = inject(AuthService);
   isActive(path: string) { return this.router.url.startsWith(path); }
 }

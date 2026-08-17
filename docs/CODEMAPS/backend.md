@@ -27,7 +27,10 @@
 │   ├── PATCH /:id              — Update run (requireAuth, creator only)
 │   ├── DELETE /:id             — Delete run (requireAuth, creator only)
 │   ├── POST /:id/join          — Toggle join/unjoin (requireAuth)
-│   └── POST /:id/link-strava   — Link Strava activity to run attendee record (requireAuth)
+│   ├── POST /:id/link-strava   — Link Strava activity to run attendee record (requireAuth)
+│   ├── GET /:id/comments       — Run chat messages (public read)
+│   ├── POST /:id/comments      — Post chat message (requireAuth)
+│   └── GET /nearby             — Nearest upcoming runs by lat/lng (public)
 ├── /clubs (clubs.routes.ts)
 │   ├── GET /                   — List all clubs with member_count + next_run_date
 │   ├── GET /mine               — Clubs user is member of (requireAuth)

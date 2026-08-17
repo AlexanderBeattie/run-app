@@ -1,6 +1,5 @@
 import { Component, Input, Output, EventEmitter, inject, OnInit, AfterViewInit, ElementRef, ViewChild, signal, computed, DestroyRef } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { HttpClient } from '@angular/common/http';
 import { RunnerProfileDialogComponent } from '../runner-profile-dialog/runner-profile-dialog.component';
 import { ShareCardModalComponent } from '../share-card-modal/share-card-modal.component';
 import { StravaSelectorModalComponent } from '../strava-selector-modal/strava-selector-modal.component';
@@ -140,7 +139,7 @@ declare const google: any;
             <button class="share-btn" (click)="share()">↗ Share</button>
           }
           <button class="join-btn" [class.joined]="isJoined" (click)="join.emit(run.id)">
-            {{ isJoined ? "You're going, tap to unjoin" : "I'm coming" }}
+            {{ auth.isLoggedIn() ? (isJoined ? "You're going, tap to unjoin" : "I'm coming") : 'Sign in to join' }}
           </button>
         </div>
         @if (showShareCard()) {
@@ -229,7 +228,6 @@ export class RunDetailDialogComponent implements OnInit, AfterViewInit {
   svc = inject(RunsService);
   auth = inject(AuthService);
   toast = inject(ToastService);
-  http = inject(HttpClient);
   private destroyRef = inject(DestroyRef);
   attendees: { id: string; display_name: string; has_verified_pace: boolean }[] = [];
   weather = signal<{ temp: number; condition: string; icon: string } | null>(null);
@@ -290,10 +288,9 @@ export class RunDetailDialogComponent implements OnInit, AfterViewInit {
         .subscribe(r => this.nextRun.set(r));
     }
     if (this.run.startLocation?.lat && this.run.startLocation?.lng) {
-      this.http.get<{ temp: number; condition: string; icon: string }>(
-        `/api/runs/${this.run.id}/weather`
-      ).pipe(takeUntilDestroyed(this.destroyRef))
-        .subscribe({ next: w => this.weather.set(w), error: () => {} });
+      this.svc.getWeather(this.run.id)
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe({ next: w => this.weather.set(w), error: () => this.weather.set(null) });
     }
   }
   ngAfterViewInit() { setTimeout(() => this.initMap(), 150); }

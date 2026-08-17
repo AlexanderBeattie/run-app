@@ -34,7 +34,10 @@ describe('HomeComponent', () => {
       fetchRuns: jest.fn().mockReturnValue(of([])),
       getRuns: jest.fn().mockReturnValue(signal([])),
       getJoinedRunIds: jest.fn().mockReturnValue(signal([])),
-      toggleJoin: jest.fn()
+      toggleJoin: jest.fn(),
+      loading: signal(false),
+      formatDate: jest.fn().mockReturnValue('Today'),
+      formatTime: jest.fn().mockReturnValue('09:00')
     };
     authService = {
       getUser: jest.fn().mockReturnValue(signal({ displayName: 'Alex Beattie', role: 'runner' })),
@@ -124,9 +127,10 @@ describe('HomeComponent', () => {
     expect(component.hasActiveFilters).toBe(true);
   });
 
-  it('sets loaded to true after timeout', async () => {
+  it('loaded reflects the RunsService loading signal', () => {
+    runsService.loading.set(true);
     expect(component.loaded).toBe(false);
-    await new Promise(r => setTimeout(r, 700));
+    runsService.loading.set(false);
     expect(component.loaded).toBe(true);
   });
 });

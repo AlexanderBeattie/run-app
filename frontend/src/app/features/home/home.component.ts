@@ -1,5 +1,4 @@
-import { Component, inject, OnInit, ChangeDetectorRef, signal, computed, DestroyRef, HostListener } from '@angular/core';
-import { FormsModule } from '@angular/forms';
+import { Component, inject, OnInit, ChangeDetectorRef, signal, computed } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { RunsService } from '../../core/services/runs.service';
 import { AuthService } from '../../core/services/auth.service';
@@ -14,21 +13,19 @@ import { LocationWelcomeModalComponent } from '../../shared/components/location-
 import { FirstRunCtaBlockComponent } from '../../shared/components/first-run-cta-block/first-run-cta-block.component';
 import { GeolocationService } from '../../core/services/geolocation.service';
 import { RunEvent, Club } from '../../core/models/run-event.model';
-import { Subject, debounceTime, distinctUntilChanged } from 'rxjs';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { environment } from '../../../environments/environment';
 import { RunMiniCarouselComponent } from './run-mini-carousel.component';
 import { CategoryTilesComponent, HomeCategory } from './category-tiles.component';
 import { ClubsStripComponent } from './clubs-strip.component';
 import { FeaturedClubsComponent } from './featured-clubs.component';
-import { gradientForPace } from '../../shared/utils/run-pace';
+import { HomeSearchBarComponent } from './home-search-bar.component';
 
 @Component({
   selector: 'app-home',
   standalone: true,
   imports: [
     RunCardComponent, RunDetailDialogComponent, OnboardingComponent, LocationWelcomeModalComponent,
-    FirstRunCtaBlockComponent, FormsModule,
+    FirstRunCtaBlockComponent, HomeSearchBarComponent,
     RunMiniCarouselComponent, CategoryTilesComponent, ClubsStripComponent, FeaturedClubsComponent,
   ],
   template: `
@@ -57,49 +54,10 @@ import { gradientForPace } from '../../shared/utils/run-pace';
       </div>
 
       <!-- Search -->
-      <div class="search-row">
-        <div class="search-box">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6B6B68" stroke-width="2.5">
-            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-          </svg>
-          <input
-            type="text"
-            [(ngModel)]="searchQuery"
-            (ngModelChange)="onSearchChange($event)"
-            (focus)="onSearchFocus()"
-            placeholder="Search runs, clubs, areas..." />
-        </div>
-        <button class="filter-btn" [class.active]="hasActiveFilters">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-            <line x1="4" y1="6" x2="20" y2="6"/>
-            <line x1="8" y1="12" x2="16" y2="12"/>
-            <line x1="11" y1="18" x2="13" y2="18"/>
-          </svg>
-        </button>
-
-        <!-- Search dropdown -->
-        @if (showDropdown() && searchResults().length > 0) {
-          <div class="search-dropdown">
-            @for (result of searchResults(); track result.id) {
-              <div class="search-result-row" (click)="onSelectSearchResult(result)">
-                <div class="sr-left">
-                  <div class="sr-icon" [style.background]="gradientForPace(result.pace)"></div>
-                  <div class="sr-info">
-                    <div class="sr-title">{{ result.title }}</div>
-                    <div class="sr-meta">{{ runsService.formatDate(result.date) }} · {{ result.distanceKm }}km</div>
-                  </div>
-                </div>
-                <div class="sr-pace" [class]="'sr-pace-' + (result.pace ?? 'default')">{{ result.pace ?? '' }}</div>
-              </div>
-            }
-          </div>
-        }
-        @if (showDropdown() && searchQuery.length >= 2 && searchResults().length === 0 && !searchLoading()) {
-          <div class="search-dropdown search-dropdown-empty">
-            <div class="sr-empty">No runs found for "{{ searchQuery }}"</div>
-          </div>
-        }
-      </div>
+      <app-home-search-bar
+        [filtersActive]="hasActiveFilters"
+        (search)="onSearch($event)"
+        (resultSelected)="openDialog($event)" />
 
       <!-- Category tiles -->
       <app-category-tiles [categories]="categories" [active]="activeCategory" (select)="setCategory($event)" />
@@ -294,116 +252,6 @@ import { gradientForPace } from '../../shared/utils/run-pace';
       cursor: pointer;
       margin-top: 2px;
     }
-
-    /* ── Search ─────────────────────────────────────────────── */
-    .search-row {
-      display: flex;
-      gap: 10px;
-      padding: 0 16px 18px;
-      position: relative;
-    }
-    .search-box {
-      flex: 1;
-      background: #F7F7F5;
-      border-radius: 14px;
-      padding: 13px 16px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    .search-box input {
-      border: none;
-      outline: none;
-      background: transparent;
-      color: #0D0D0D;
-      font-size: 14px;
-      font-family: inherit;
-      flex: 1;
-    }
-    .search-box input::placeholder { color: #6B6B68; }
-    .filter-btn {
-      background: #F7F7F5;
-      border: none;
-      width: 50px; height: 50px;
-      border-radius: 14px;
-      display: flex; align-items: center; justify-content: center;
-      cursor: pointer;
-      color: #0D0D0D;
-      flex-shrink: 0;
-      transition: background 0.15s;
-    }
-    .filter-btn.active { background: #0D0D0D; color: #fff; }
-
-    /* ── Search dropdown ─────────────────────────────────────── */
-    .search-dropdown {
-      position: absolute;
-      top: calc(100% - 10px);
-      left: 16px;
-      right: 76px;
-      background: #fff;
-      border-radius: 14px;
-      box-shadow: var(--shadow-overlay, 0 8px 32px rgba(13,13,12,0.16)), 0 0 0 0.5px rgba(0,0,0,0.08);
-      z-index: 200;
-      overflow: hidden;
-    }
-    .search-dropdown-empty {
-      padding: 16px;
-    }
-    .sr-empty {
-      font-size: 13px;
-      color: #6B6B68;
-      text-align: center;
-    }
-    .search-result-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 12px 14px;
-      cursor: pointer;
-      border-bottom: 0.5px solid rgba(0,0,0,0.06);
-      transition: background 0.1s;
-    }
-    .search-result-row:last-child { border-bottom: none; }
-    .search-result-row:active { background: #F7F7F5; }
-    .sr-left {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      flex: 1;
-      min-width: 0;
-    }
-    .sr-icon {
-      width: 32px; height: 32px;
-      border-radius: 10px;
-      flex-shrink: 0;
-    }
-    .sr-info { min-width: 0; }
-    .sr-title {
-      font-size: 14px;
-      font-weight: 500;
-      color: #0D0D0D;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .sr-meta {
-      font-size: 12px;
-      color: #6B6B68;
-      margin-top: 1px;
-    }
-    .sr-pace {
-      font-size: 10px;
-      font-weight: 600;
-      border-radius: 999px;
-      padding: 2px 8px;
-      text-transform: capitalize;
-      flex-shrink: 0;
-      margin-left: 8px;
-    }
-    .sr-pace-easy, .sr-pace-social { background: #E1F5EE; color: #0F6E56; }
-    .sr-pace-moderate { background: #EFF6FF; color: #1e3a8a; }
-    .sr-pace-fast, .sr-pace-tempo { background: #FEF2F2; color: #7f1d1d; }
-    .sr-pace-default { display: none; }
 
     /* ── Feed ───────────────────────────────────────────────── */
     .feed-header { padding: 0 20px 14px; }
@@ -601,7 +449,6 @@ export class HomeComponent implements OnInit {
   clubService = inject(ClubService);
   toast = inject(ToastService);
   cdr = inject(ChangeDetectorRef);
-  destroyRef = inject(DestroyRef);
   private http = inject(HttpClient);
   private geoService = inject(GeoService);
   private geolocationService = inject(GeolocationService);
@@ -649,17 +496,12 @@ export class HomeComponent implements OnInit {
 
   readonly featuredClubs = computed(() => this.clubs().slice(0, 4));
   locationLabel = signal('Locating...');
-  searchResults = signal<RunEvent[]>([]);
-  showDropdown = signal(false);
-  searchLoading = signal(false);
-  loaded = false;
   searchQuery = '';
   activeCategory = 'All';
 
-  private searchSubject = new Subject<string>();
   private currentParams: any = {};
 
-  readonly gradientForPace = gradientForPace;
+  get loaded(): boolean { return !this.runsService.loading(); }
 
   readonly pacePills = [
     { value: 'social',   label: 'Social',   color: '#10B981', effort: 'chatty pace' },
@@ -721,14 +563,6 @@ export class HomeComponent implements OnInit {
     this.loadWithParams();
   }
 
-  @HostListener('document:click', ['$event'])
-  onDocumentClick(e: MouseEvent) {
-    const target = e.target as HTMLElement;
-    if (!target.closest('.search-row')) {
-      this.showDropdown.set(false);
-    }
-  }
-
   onOnboardingComplete(prefs: OnboardingPrefs) {
     this.showOnboarding.set(false);
     if (prefs.pace) this.activePace.set(prefs.pace);
@@ -741,32 +575,12 @@ export class HomeComponent implements OnInit {
     this.detectLocation();
     this.loadWithParams();
     this.loadCarousels();
+  }
 
-    // Main feed search subscription
-    this.searchSubject.pipe(debounceTime(300), distinctUntilChanged(), takeUntilDestroyed(this.destroyRef)).subscribe(q => {
-      this.currentParams = { ...this.currentParams, search: q || undefined };
-      this.loadWithParams();
-
-      // Dropdown search subscription
-      if (q.length >= 2) {
-        this.searchLoading.set(true);
-        this.runsService.fetchRuns({ search: q }).subscribe({
-          next: runs => {
-            this.searchResults.set(runs.slice(0, 6));
-            this.showDropdown.set(true);
-            this.searchLoading.set(false);
-            this.cdr.markForCheck();
-          },
-          error: () => {
-            this.searchResults.set([]);
-            this.searchLoading.set(false);
-          }
-        });
-      } else {
-        this.searchResults.set([]);
-        this.showDropdown.set(false);
-      }
-    });
+  onSearch(q: string) {
+    this.searchQuery = q;
+    this.currentParams = { ...this.currentParams, search: q || undefined };
+    this.loadWithParams();
   }
 
   private loadGeoPreferences() {
@@ -873,17 +687,6 @@ export class HomeComponent implements OnInit {
     return cityPart ?? parts[0] ?? 'Near you';
   }
 
-  onSearchFocus() {
-    if (this.searchQuery.length >= 2 && this.searchResults().length > 0) {
-      this.showDropdown.set(true);
-    }
-  }
-
-  onSelectSearchResult(run: RunEvent) {
-    this.showDropdown.set(false);
-    this.openDialog(run);
-  }
-
   private loadCarousels() {
     this.clubService.listClubs().subscribe({ next: clubs => this.clubs.set(clubs.slice(0, 12)), error: (e) => console.error('Failed to load clubs carousel', e) });
 
@@ -905,10 +708,6 @@ export class HomeComponent implements OnInit {
     return { dateFrom: fmt(sat), dateTo: fmt(sun) };
   }
 
-  onSearchChange(q: string) {
-    this.searchSubject.next(q);
-  }
-
   setCategory(cat: { label: string; params: any }) {
     this.activeCategory = cat.label;
     this.currentParams = { ...cat.params };
@@ -921,17 +720,13 @@ export class HomeComponent implements OnInit {
     if (mode === 'mine') {
       this.clubService.getMineClubs().subscribe({
         next: myClubs => {
-          if (myClubs.length === 0) {
-            this.runsService.loadRuns({ ...this.currentParams });
-          } else {
-            const clubIds = myClubs.map(c => c.id).join(',');
-            this.runsService.loadRuns({ ...this.currentParams, club_ids: clubIds });
-          }
-          setTimeout(() => { this.loaded = true; this.cdr.markForCheck(); }, 400);
+          const clubIds = myClubs.map(c => c.id).join(',');
+          this.runsService.loadRuns(clubIds
+            ? { ...this.currentParams, club_ids: clubIds }
+            : { ...this.currentParams });
         },
         error: () => this.loadWithParams()
       });
-      this.loaded = false;
     } else {
       this.loadWithParams();
     }
@@ -949,16 +744,16 @@ export class HomeComponent implements OnInit {
   }
 
   private loadWithParams() {
-    this.loaded = false;
     const runType = this.activeRunType();
     this.runsService.loadRuns({ ...this.currentParams, ...(runType ? { run_type: runType } : {}) });
-    setTimeout(() => { this.loaded = true; this.cdr.markForCheck(); }, 600);
   }
 
   openDialog(run: RunEvent) { this.selectedRun.set(run); }
 
   onJoin(runId: string) {
-    this.runsService.toggleJoin(runId, this.auth.getUser()()?.id ?? 'guest');
+    const user = this.auth.getUser()();
+    if (!user) return;
+    this.runsService.toggleJoin(runId, user.id);
     const isJoined = this.runsService.getJoinedRunIds()().includes(runId);
     this.toast.show(isJoined ? 'Left the run' : "You're in!");
   }

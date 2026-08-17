@@ -17,7 +17,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 const allowedOrigins = [
-  'http://localhost:4200',
+  'http://localhost:4201',
   process.env.CORS_ORIGIN,
 ].filter(Boolean) as string[];
 

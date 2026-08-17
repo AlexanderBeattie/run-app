@@ -186,7 +186,7 @@ PORT=3000                                 # Express server port
 DATABASE_URL=postgresql://user:pass@...   # PostgreSQL connection
 JWT_SECRET=your-secret-key               # Token signing key
 JWT_EXPIRES_IN=1h                        # JWT lifetime (refresh tokens handle session continuity)
-CORS_ORIGIN=http://localhost:4200        # Production frontend origin
+CORS_ORIGIN=http://localhost:4201        # Production frontend origin
 GOOGLE_SERVER_API_KEY=AIzaSyA...         # Server-side Geocoding API
 ```
 
@@ -198,7 +198,7 @@ See [dependencies.md](dependencies.md#environment-variables) for details.
 
 ```bash
 # Development
-npm run dev              # Start frontend (4200) + backend (3000)
+npm run dev              # Start frontend (4201) + backend (3000)
 npm run build:frontend   # Generate env + ng build
 npm run build:backend    # tsc compile
 

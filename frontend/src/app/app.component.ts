@@ -2,7 +2,8 @@ import { Component, inject } from '@angular/core';
 import { RouterOutlet, Router } from '@angular/router';
 import { BottomNavComponent } from './shared/components/bottom-nav/bottom-nav.component';
 import { ToastComponent } from './shared/components/toast/toast.component';
-import { AuthService } from './core/services/auth.service';
+
+const AUTH_PAGES = ['/login', '/register', '/forgot-password', '/reset-password'];
 
 @Component({
   selector: 'app-root',
@@ -35,11 +36,11 @@ import { AuthService } from './core/services/auth.service';
   `]
 })
 export class AppComponent {
-  auth = inject(AuthService);
   router = inject(Router);
 
+  // Nav is visible for guests too (map is public); only auth screens hide it.
   get showNav() {
     const url = this.router.url;
-    return this.auth.isLoggedIn() && !url.includes('/login') && !url.includes('/register');
+    return !AUTH_PAGES.some(page => url.startsWith(page));
   }
 }

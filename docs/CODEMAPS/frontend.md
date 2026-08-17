@@ -9,22 +9,30 @@
 
 ```
 routes (app.routes.ts)
-├── / → redirect home
-├── /login               LoadComponent: LoginComponent (no guard)
+├── / → entryGuard: UrlTree redirect → /home (logged in) | /map (guest)
+├── /login               LoadComponent: LoginComponent (no guard; honours ?returnUrl=)
 ├── /register            LoadComponent: RegisterComponent (no guard)
 ├── /forgot-password     LoadComponent: ForgotPasswordComponent (no guard)
 ├── /reset-password      LoadComponent: ResetPasswordComponent (no guard)
 ├── /home        (authGuard) → HomeComponent
-├── /map         (authGuard) → MapViewComponent
+├── /map         (PUBLIC — guest access) → MapViewComponent
 ├── /clubs       (authGuard) → ClubListComponent
 │   ├── /clubs/create              (organizerGuard) → CreateClubComponent
 │   ├── /clubs/create-run          (organizerGuard) → CreateRunComponent (wizard)
 │   ├── /clubs/edit-run/:id        (organizerGuard) → EditRunComponent
+│   ├── /clubs/edit/:id            (organizerGuard) → EditClubComponent
 │   └── /clubs/:id         (authGuard) → ClubProfileComponent
-├── /profile             (authGuard) → RunnerProfileComponent
-├── /organiser           (organizerGuard) → OrganiserHomeComponent
-└── ** → redirect home
+├── /profile             (authGuard) → RunnerProfileComponent (embeds OrganiserHome for organizers)
+├── /organiser           → redirect /profile
+└── ** → redirect / (re-runs guest/logged-in split)
 ```
+
+**Guest mode:** `/map` is public. Guests can browse runs, open the run detail
+dialog (attendees, weather, chat read-only), and are funnelled to
+`/login?returnUrl=…` when they try to join, chat, or open any guarded tab.
+Bottom nav shows for guests everywhere except auth screens; the Profile tab
+becomes "Sign in" when logged out. Guards attach `?returnUrl=` and login
+honours it.
 
 **Route Ordering (critical):** Static routes MUST come before parameterized: `/clubs/create` before `/clubs/:id`
 

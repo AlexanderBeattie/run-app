@@ -38,3 +38,8 @@ npm-debug.log*
 
 # Personal
 _claude.md
+# Test artifacts
+playwright-report/
+test-results/
+.angular/
+frontend/.angular/

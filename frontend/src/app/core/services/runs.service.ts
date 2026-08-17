@@ -4,14 +4,31 @@ import { map } from 'rxjs/operators';
 import { RunEvent, CreateRunPayload, Comment } from '../models/run-event.model';
 import { environment } from '../../../environments/environment';
 
+export interface RunQueryParams {
+  search?: string; distance_min?: number; date?: string; city?: string;
+  pace?: string; trending?: boolean; tags?: string; club_ids?: string;
+  club_id?: string; date_from?: string; date_to?: string; run_type?: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class RunsService {
   private http = inject(HttpClient);
   private runs = signal<RunEvent[]>([]);
   private joinedRunIds = signal<string[]>([]);
+  readonly loading = signal(false);
 
   getRuns() { return this.runs; }
   getJoinedRunIds() { return this.joinedRunIds; }
+
+  private buildQueryParams(params?: RunQueryParams): Record<string, string | number> {
+    if (!params) return {};
+    const query: Record<string, string | number> = {};
+    for (const [key, value] of Object.entries(params)) {
+      if (value === undefined || value === null || value === '' || value === false) continue;
+      query[key] = value === true ? 1 : value;
+    }
+    return query;
+  }
 
   mapRun(r: any): RunEvent {
     return {
@@ -32,46 +49,25 @@ export class RunsService {
     };
   }
 
-  loadRuns(params?: {
-    search?: string; distance_min?: number; date?: string; city?: string;
-    pace?: string; trending?: boolean; tags?: string; club_ids?: string;
-    run_type?: string;
-  }) {
-    const queryParams: any = {};
-    if (params?.search) queryParams.search = params.search;
-    if (params?.distance_min) queryParams.distance_min = params.distance_min;
-    if (params?.date) queryParams.date = params.date;
-    if (params?.city) queryParams.city = params.city;
-    if (params?.pace) queryParams.pace = params.pace;
-    if (params?.trending) queryParams.trending = 1;
-    if (params?.tags) queryParams.tags = params.tags;
-    if (params?.club_ids) queryParams.club_ids = params.club_ids;
-    if (params?.run_type) queryParams.run_type = params.run_type;
-    return this.http.get<any[]>(`${environment.apiUrl}/runs`, { params: queryParams }).subscribe(data => {
-      this.runs.set(data.map(r => this.mapRun(r)));
+  loadRuns(params?: RunQueryParams) {
+    this.loading.set(true);
+    return this.fetchRuns(params).subscribe({
+      next: runs => { this.runs.set(runs); this.loading.set(false); },
+      error: err => {
+        console.error('[KLUB] Failed to load runs', err);
+        this.loading.set(false);
+      }
     });
   }
 
-  fetchRuns(params?: {
-    search?: string; distance_min?: number; date?: string; city?: string;
-    pace?: string; trending?: boolean; tags?: string; club_ids?: string;
-    date_from?: string; date_to?: string; run_type?: string;
-  }) {
-    const queryParams: any = {};
-    if (params?.search) queryParams.search = params.search;
-    if (params?.distance_min) queryParams.distance_min = params.distance_min;
-    if (params?.date) queryParams.date = params.date;
-    if (params?.city) queryParams.city = params.city;
-    if (params?.pace) queryParams.pace = params.pace;
-    if (params?.trending) queryParams.trending = 1;
-    if (params?.tags) queryParams.tags = params.tags;
-    if (params?.club_ids) queryParams.club_ids = params.club_ids;
-    if (params?.date_from) queryParams.date_from = params.date_from;
-    if (params?.date_to) queryParams.date_to = params.date_to;
-    if (params?.run_type) queryParams.run_type = params.run_type;
-    return this.http.get<any[]>(`${environment.apiUrl}/runs`, { params: queryParams }).pipe(
+  fetchRuns(params?: RunQueryParams) {
+    return this.http.get<any[]>(`${environment.apiUrl}/runs`, { params: this.buildQueryParams(params) }).pipe(
       map(data => data.map(r => this.mapRun(r)))
     );
+  }
+
+  getWeather(runId: string) {
+    return this.http.get<{ temp: number; condition: string; icon: string }>(`${environment.apiUrl}/runs/${runId}/weather`);
   }
 
   getNearbyRuns(lat: number, lng: number, limit = 3) {

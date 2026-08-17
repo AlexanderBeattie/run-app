@@ -1,6 +1,6 @@
 import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
 
 @Component({
@@ -22,6 +22,7 @@ import { AuthService } from '../../core/services/auth.service';
         <button class="submit" (click)="login()">Log in</button>
         <p class="forgot"><a routerLink="/forgot-password">Forgot password?</a></p>
         <p class="switch">Don't have an account? <a routerLink="/register">Join KLUB</a></p>
+        <p class="switch"><a routerLink="/map">Explore runs on the map as a guest</a></p>
       </div>
     </div>
   `,
@@ -47,12 +48,15 @@ import { AuthService } from '../../core/services/auth.service';
   `]
 })
 export class LoginComponent {
-  auth = inject(AuthService); router = inject(Router);
+  auth = inject(AuthService); router = inject(Router); route = inject(ActivatedRoute);
   email=''; password=''; error='';
   login() {
     if (!this.email || !this.password) { this.error = 'Please enter your email and password.'; return; }
     this.auth.login(this.email, this.password).subscribe({
-      next: () => this.router.navigate(['/home']),
+      next: () => {
+        const returnUrl = this.route.snapshot.queryParamMap.get('returnUrl');
+        this.router.navigateByUrl(returnUrl && returnUrl.startsWith('/') ? returnUrl : '/home');
+      },
       error: () => this.error = 'Invalid email or password.'
     });
   }

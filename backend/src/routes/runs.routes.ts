@@ -364,8 +364,8 @@ router.post('/:id/join', requireAuth, async (req: AuthRequest, res: Response) =>
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
-// GET /api/runs/:id/comments — fetch comments for a run with user details
-router.get('/:id/comments', requireAuth, async (req: AuthRequest, res: Response) => {
+// GET /api/runs/:id/comments — fetch comments for a run with user details (public read; posting requires auth)
+router.get('/:id/comments', async (req: Request, res: Response) => {
   const { id } = req.params;
   try {
     const result = await pool.query(

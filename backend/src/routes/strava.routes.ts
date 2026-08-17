@@ -164,7 +164,7 @@ router.get('/strava/callback', async (req: Request, res: Response) => {
     return;
   }
 
-  const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:4200';
+  const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:4201';
   res.redirect(`${frontendUrl}/profile?strava=connected`);
 });
 

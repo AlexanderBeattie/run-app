@@ -394,7 +394,7 @@ npx playwright show-report
   testDir: './e2e',
   timeout: 30_000,              // 30 seconds per test
   use: {
-    baseURL: 'http://localhost:4200',
+    baseURL: 'http://localhost:4201',
     trace: 'on-first-retry',    // Trace failures
     screenshot: 'only-on-failure',
   },
@@ -410,7 +410,7 @@ npx playwright show-report
   ],
   webServer: {
     command: 'npm run dev:frontend',
-    url: 'http://localhost:4200',
+    url: 'http://localhost:4201',
     reuseExistingServer: !process.env['CI'],
   },
 }

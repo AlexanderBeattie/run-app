@@ -161,7 +161,7 @@
 ## Script Commands Reference
 
 ```bash
-npm run dev              # Start frontend (4200) + backend (3000) concurrently
+npm run dev              # Start frontend (4201) + backend (3000) concurrently
 npm run build:frontend   # Gen env + Angular build
 npm run build:backend    # TypeScript compile
 npm run test             # Jest on both workspaces

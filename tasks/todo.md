@@ -52,6 +52,13 @@
 
 ---
 
+## ✅ Recently Completed (Guest Mode & Cleanup — Aug 2026)
+- [x] **Guest Access:** `/map` is public; guests land on the map by default, can view runs (detail, attendees, weather, read-only chat), and are funnelled to `/login?returnUrl=…` for join/chat/everything else. Bottom nav shows a "Sign in" tab for guests.
+- [x] **returnUrl flow:** auth/organizer guards pass `returnUrl`; login honours it.
+- [x] **RunsService cleanup:** deduplicated `loadRuns`/`fetchRuns` param building; added `loading` signal (replaces fake `setTimeout` skeletons on Home); added `getWeather()` — fixes run-detail weather call that used a hardcoded `/api` path (broken on split-domain deploys).
+- [x] **Home refactor:** extracted `HomeSearchBarComponent` (home.component 966 → 761 lines, back under the 800 hard max).
+- [x] **Repo hygiene:** untracked `playwright-report/` + `test-results/` artifacts, gitignored.
+
 ## ✅ Recently Completed (The "Unbreakable" Sprint)
 - [x] **AES-256 Encryption:** All Strava tokens encrypted at rest in DB.
 - [x] **Proactive Refresh:** Automatic Strava token refresh logic (5-min buffer).

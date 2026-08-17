@@ -8,7 +8,7 @@ process.env.JWT_SECRET = 'test-secret';
 process.env.STRAVA_CLIENT_ID = 'test-client-id';
 process.env.STRAVA_CLIENT_SECRET = 'test-client-secret';
 process.env.STRAVA_REDIRECT_URI = 'http://localhost:3000/api/auth/strava/callback';
-process.env.FRONTEND_URL = 'http://localhost:4200';
+process.env.FRONTEND_URL = 'http://localhost:4201';
 
 jest.mock('../../db', () => ({
   pool: { query: jest.fn() },
@@ -239,7 +239,7 @@ describe('GET /api/auth/strava/callback', () => {
 
     const res = await request(app).get(`/api/auth/strava/callback?code=good-code&state=${state}`);
     expect(res.status).toBe(302);
-    expect(res.headers.location).toBe('http://localhost:4200/profile?strava=connected');
+    expect(res.headers.location).toBe('http://localhost:4201/profile?strava=connected');
   });
 
   it('state is consumed after use — second request with same state returns 400', async () => {
@@ -263,7 +263,7 @@ describe('GET /api/auth/strava/callback', () => {
     expect(res2.body.error).toBe('Invalid or expired state token');
   });
 
-  it('falls back to localhost:4200 as frontendUrl when FRONTEND_URL is unset', async () => {
+  it('falls back to localhost:4201 as frontendUrl when FRONTEND_URL is unset', async () => {
     const saved = process.env.FRONTEND_URL;
     delete process.env.FRONTEND_URL;
 
@@ -280,7 +280,7 @@ describe('GET /api/auth/strava/callback', () => {
 
     const res = await request(app).get(`/api/auth/strava/callback?code=good-code&state=${state}`);
     expect(res.status).toBe(302);
-    expect(res.headers.location).toContain('localhost:4200');
+    expect(res.headers.location).toContain('localhost:4201');
 
     process.env.FRONTEND_URL = saved;
   });
