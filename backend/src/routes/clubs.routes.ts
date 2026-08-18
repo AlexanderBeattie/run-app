@@ -58,12 +58,12 @@ router.get('/owned', requireAuth, async (req: AuthRequest, res: Response) => {
 
 // Create club
 router.post('/', requireAuth, async (req: AuthRequest, res: Response) => {
-  const { name, description, city, pace, tags } = req.body;
+  const { name, description, city, pace, tags, logo_url, color } = req.body;
   if (!name) { res.status(400).json({ error: 'Club name is required' }); return; }
   try {
     const result = await pool.query(
-      'INSERT INTO clubs (name, description, owner_id, city, pace, tags) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *',
-      [name, description ?? null, req.user!.id, city ?? null, pace ?? null, tags ?? []]
+      'INSERT INTO clubs (name, description, owner_id, city, pace, tags, logo_url, color) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *',
+      [name, description ?? null, req.user!.id, city ?? null, pace ?? null, tags ?? [], logo_url ?? null, color ?? null]
     );
     const club = result.rows[0];
     // Auto-join owner as member
@@ -78,7 +78,8 @@ router.get('/:id', async (req: Request, res: Response) => {
     const result = await pool.query(`
       SELECT c.*,
         (SELECT COUNT(*) FROM club_members cm WHERE cm.club_id = c.id)::int AS member_count,
-        (SELECT COUNT(*) FROM run_events r WHERE r.club_id = c.id AND r.status = 'active')::int AS active_run_count
+        (SELECT COUNT(*) FROM run_events r WHERE r.club_id = c.id AND r.status = 'active')::int AS active_run_count,
+        (SELECT COUNT(*) FROM run_events r WHERE r.club_id = c.id)::int AS total_runs_count
       FROM clubs c WHERE c.id = $1
     `, [req.params.id]);
     if (!result.rows.length) { res.status(404).json({ error: 'Not found' }); return; }
@@ -89,7 +90,7 @@ router.get('/:id', async (req: Request, res: Response) => {
 // Update club (owner only)
 router.patch('/:id', requireAuth, async (req: AuthRequest, res: Response) => {
   const { id } = req.params;
-  const { name, description, city, pace, tags } = req.body;
+  const { name, description, city, pace, tags, logo_url, color } = req.body;
   try {
     const existing = await pool.query('SELECT owner_id FROM clubs WHERE id = $1', [id]);
     if (!existing.rows.length) { res.status(404).json({ error: 'Not found' }); return; }
@@ -100,9 +101,11 @@ router.patch('/:id', requireAuth, async (req: AuthRequest, res: Response) => {
         description = COALESCE($2, description),
         city = COALESCE($3, city),
         pace = COALESCE($4, pace),
-        tags = COALESCE($5, tags)
-      WHERE id = $6 RETURNING *
-    `, [name ?? null, description ?? null, city ?? null, pace ?? null, tags ?? null, id]);
+        tags = COALESCE($5, tags),
+        logo_url = COALESCE($6, logo_url),
+        color = COALESCE($7, color)
+      WHERE id = $8 RETURNING *
+    `, [name ?? null, description ?? null, city ?? null, pace ?? null, tags ?? null, logo_url ?? null, color ?? null, id]);
     res.json(result.rows[0]);
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });

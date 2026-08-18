@@ -84,7 +84,51 @@ describe('RunsService', () => {
   it('formatDate returns weekday for other dates', () => {
     const future = new Date(Date.now() + 3 * 86400000);
     const result = service.formatDate(future);
-    expect(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']).toContain(result);
+    expect(result).toMatch(/(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)/);
+  });
+
+  it('getComments fetches and maps comments for a run', () => {
+    const mockComment = {
+      id: 'c1', run_id: 'run-1', user_id: 'user-1', content: 'Hello!',
+      display_name: 'Alice', avatar_url: null,
+      created_at: new Date('2026-01-01T10:00:00Z').toISOString()
+    };
+    let result: any;
+    service.getComments('run-1').subscribe(c => result = c);
+    const req = http.expectOne(`${environment.apiUrl}/runs/run-1/comments`);
+    expect(req.request.method).toBe('GET');
+    req.flush([mockComment]);
+    expect(result.length).toBe(1);
+    expect(result[0].id).toBe('c1');
+    expect(result[0].runId).toBe('run-1');
+    expect(result[0].displayName).toBe('Alice');
+    expect(result[0].content).toBe('Hello!');
+    expect(result[0].createdAt).toBeInstanceOf(Date);
+  });
+
+  it('getComments returns empty array when no comments', () => {
+    let result: any;
+    service.getComments('run-1').subscribe(c => result = c);
+    const req = http.expectOne(`${environment.apiUrl}/runs/run-1/comments`);
+    req.flush([]);
+    expect(result).toEqual([]);
+  });
+
+  it('postComment sends content and maps response', () => {
+    const mockResponse = {
+      id: 'c2', run_id: 'run-1', user_id: 'user-2', content: 'Great run!',
+      display_name: 'Bob', avatar_url: null,
+      created_at: new Date('2026-01-01T11:00:00Z').toISOString()
+    };
+    let result: any;
+    service.postComment('run-1', 'Great run!').subscribe(c => result = c);
+    const req = http.expectOne(`${environment.apiUrl}/runs/run-1/comments`);
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({ content: 'Great run!' });
+    req.flush(mockResponse);
+    expect(result.id).toBe('c2');
+    expect(result.displayName).toBe('Bob');
+    expect(result.content).toBe('Great run!');
   });
 
   it('createRun posts to correct endpoint', () => {

@@ -1,60 +1,68 @@
 # KLUB — Task Queue
 
-## Status: Phase 4 — Deployment Readiness
-
-> Full post-launch roadmap → `tasks/roadmap.md` (not loaded automatically)
-
----
-
-## Active Sprint: Phase 4
-
-### Security — blockers before public launch
-> Context: zero file reads — all external config; trust CLAUDE.md for env var names
-- [ ] Google Maps API key: add HTTP referrer restrictions in Google Cloud Console
-- [ ] Google Maps API key: restrict to Maps JS + Geocoding + Directions APIs only
-- [ ] Backend geocode key: add server IP restriction (Render static IP or proxy)
-- [ ] Run migration-001.sql on production DB (club_members table, clubs pace/tags/city/logo_url columns, run_events pace/tags columns)
-- [ ] Run migration-002.sql on production DB (refresh_tokens table)
-- [ ] Run migration-003.sql on production DB (password_reset_tokens table)
-- [ ] Run migration-004.sql on production DB (run_events run_type column)
-- [ ] Schedule periodic cleanup of expired refresh tokens on Render (daily cron → `npm run db:cleanup-tokens`)
-- [ ] Audit CORS_ORIGIN in production env — must be exact Netlify URL, not wildcard
-
-> Note: `schema.sql` is now canonical (includes all migrations). Use for fresh installs only — run individual migration files against an existing production DB.
-
-### PWA
-> Context: read `angular.json` + `ngsw-config.json` only
-- [ ] Fix ngsw-worker.js 404 (Netlify serving issue)
-- [ ] Fix manifest.webmanifest MIME type not served correctly on Netlify
-- [ ] KLUB branded icons (192×192, 512×512, maskable variant)
-- [ ] Custom install-to-homescreen prompt banner
-
-### Infra
-> Context: zero file reads — external verification only
-- [ ] Verify Render backend auto-deploys from main
-- [ ] Verify Netlify build pipeline runs generate-env.js correctly
-- [ ] Smoke test all API endpoints against production DB after migrations
+**Current Focus:** Phase 6a/b — Strava Closure & Social Kickoff
+**Sprint Goal:** Finalize the Strava loop and transition KLUB from Utility to Community.
 
 ---
 
-## Completed
+## 🚨 Market Research Inserts (April 2026)
+*Two gaps identified by competitive analysis that warrant immediate action — see `tasks/roadmap.md` for full context.*
 
-### Phase 4 — Deployment Readiness
+### 0. Week-1 Onboarding Funnel (Highest Retention Leverage)
+> Retention data: users active in week 1 are 80% more likely to stay 6+ months. A new user who can't find a run near them in <60 seconds will churn. This is the biggest immediate retention risk.
+- [ ] **Location-Aware Welcome:** Post-signup screen that uses geolocation to surface the nearest 3 upcoming runs immediately.
+- [ ] **"Your First Run" CTA:** Persistent prompt on home feed for users with 0 joined runs — dismisses permanently once they join one.
+- [ ] **Empty State Fix:** Replace empty feed state (no runs in area) with a "Notify me when a run is posted near [city]" subscription prompt.
 
-- [x] **Security hardening (backend):** rate limiting (login 5/15min, register 3/hr, API 100/15min), password validation (8–128 chars), email validation, role locked to runner on register, JWT expiry 1h (was 7d), refresh token system (`refresh_tokens` table, hashed, 30d expiry), `/auth/refresh` + `/auth/logout` endpoints, token revocation on logout, expired token cleanup script (`npm run db:cleanup-tokens`) — 87 backend tests, 5 suites green
-- [x] **Security hardening (frontend):** AuthService stores `refreshToken` + `expiresIn`, `isTokenExpired()` with 60s buffer, `refresh()` observable, logout invalidates server-side token; JWT interceptor — proactive refresh before expiry, skips `/auth/` routes, force-logout on refresh failure
-- [x] **Password reset:** `POST /api/auth/forgot-password` + `POST /api/auth/reset-password` (hashed token, time-limited, used flag); ForgotPasswordComponent + ResetPasswordComponent (standalone, lazy loaded); migration-003.sql
-- [x] **Maps API:** `google.maps.Marker` → `AdvancedMarkerElement` in run-organiser-dialog; DirectionsService v2 confirmed valid, no deprecation
-- [x] **DB schema consolidated:** schema.sql now canonical — all migrations 001–004 included, constraints on role/status/run_type, 11 indexes added
-- [x] **Seed script** (`backend/src/db/seed.ts`): 5 users, 2 clubs, 7 runs (all run_types covered), 14 attendee registrations — `npm run db:seed` from root or backend; migrations 003 + 004 applied locally
+---
 
-### Phase A1 — Ahead of schedule
+## 🟢 Active Sprint: Strava Completion & Home Polish
 
-- [x] **run_type end-to-end:** migration-004.sql, backend filter/CRUD, frontend model + service, RunCard chip, CreateRun selector, HomeComponent filter pills — 110 tests green
+### 1. Strava Integration (Closure)
+- [ ] **Disconnect Strava:** Create `DELETE /api/auth/strava` (backend) to wipe tokens/athlete_id and a "Disconnect" UI in Runner Settings.
+- [ ] **Auto-Suggest Matching:** Implement date-range matching logic in `StravaSelectorModal` to highlight the most likely Strava activity for a KLUB run.
+- [ ] **Webhook Infrastructure:** Implement the listener for Strava Webhooks to automatically sync "Linked" activities when they are updated on Strava.
 
-### Phases 1–3
+### 2. Home Feed "Pro" Visuals
+- [ ] **Route Art Elevation:** Move the `RoutePreviewComponent` onto Home Feed cards. If a run has an associated route, show the SVG "fingerprint" on the card.
+- [ ] **Global Search Optimization:** Add a PostgreSQL GIN index to `run_events` (title, description) and `clubs` (name) for faster full-text search.
 
-- [x] **Phase 1–2:** full feature set — runs, clubs, maps, geocoding, toasts, nav, ownership
-- [x] **Phase 3a:** test coverage — 12 suites / 109 tests, all green
-- [x] **Phase 3b–e:** form validation, toasts, organiser dashboard, UI polish
-- [x] **Phase 3f:** discovery feed — carousels, badges, weather, Web Share API
+---
+
+## 🟠 Next Up: The Social Epic (Phase 6b)
+
+### 3. Run Chat (High Priority)
+> Market validated: post-run coordination is the #1 unmet social need across all major competitors. Strava clubs are forums; nobody owns in-run logistics chat.
+- [ ] **Database:** Create `run_comments` table (id, run_id, user_id, content, created_at).
+- [ ] **Backend:** `GET /api/runs/:id/comments` and `POST /api/runs/:id/comments`.
+- [ ] **UI:** Chat tab in `RunDetailDialog` with bottom-anchored input bar and signal-based message updates.
+
+### 4. Pace-Based Runner Matching (New — Market Gap)
+> The most-cited unmet need across Reddit, App Store reviews, and competitor analysis. Current pace filter is an event filter; users want person-level discovery ("who near me runs at my pace?").
+- [ ] **Profile Pace Field:** Add `preferred_pace_min_km` to user profiles (set during onboarding or in settings).
+- [ ] **Backend Query:** `GET /api/runs?pace_match=true` — ranks/filters runs where the posted pace overlaps the requesting user's preferred pace (±30 sec/km window).
+- [ ] **UI:** "Runs for you" section on Home Feed — a curated row of pace-matched runs above the main feed, distinct from the search filters.
+
+---
+
+## 🛡 Verification & Maintenance
+- [ ] **Error Boundaries:** Implement a global Angular ErrorHandler to catch runtime crashes and show a user-friendly Toast.
+- [ ] **API Key Hardening:** Restrict Google Maps API keys to production domain referrers in Google Cloud Console.
+- [ ] **Cleanup Job:** Schedule a daily cron on Render to delete expired refresh tokens from the DB.
+
+---
+
+## ✅ Recently Completed (Guest Mode & Cleanup — Aug 2026)
+- [x] **Guest Access:** `/map` is public; guests land on the map by default, can view runs (detail, attendees, weather, read-only chat), and are funnelled to `/login?returnUrl=…` for join/chat/everything else. Bottom nav shows a "Sign in" tab for guests.
+- [x] **returnUrl flow:** auth/organizer guards pass `returnUrl`; login honours it.
+- [x] **RunsService cleanup:** deduplicated `loadRuns`/`fetchRuns` param building; added `loading` signal (replaces fake `setTimeout` skeletons on Home); added `getWeather()` — fixes run-detail weather call that used a hardcoded `/api` path (broken on split-domain deploys).
+- [x] **Home refactor:** extracted `HomeSearchBarComponent` (home.component 966 → 761 lines, back under the 800 hard max).
+- [x] **Repo hygiene:** untracked `playwright-report/` + `test-results/` artifacts, gitignored.
+
+## ✅ Recently Completed (The "Unbreakable" Sprint)
+- [x] **AES-256 Encryption:** All Strava tokens encrypted at rest in DB.
+- [x] **Proactive Refresh:** Automatic Strava token refresh logic (5-min buffer).
+- [x] **Advanced Markers:** Full migration to `AdvancedMarkerElement` (2026 Maps API compliant).
+- [x] **Image Compression:** Frontend Canvas-based compression to stay under 1GB DB limit.
+- [x] **Dormant Data Activation:** Weather Badges, GPS Polylines, and "Spots Left" logic fully wired to UI.
+- [x] **Tag Filtering:** Interactive tag pills on Home Feed.

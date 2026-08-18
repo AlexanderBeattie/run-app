@@ -1,201 +1,75 @@
-# Claude Instructions
+PREFERENCE: Always prioritize local rules in ./.claude/rules/ and specialists in ./.claude/agents/.
 
-## Workflow Orchestration
+# Project: KLUB — Run Club Discovery Platform
 
-### 1. Plan Node Default
-- Enter plan mode for ANY non-trivial task (3+ steps or architectural decisions)
-- If something goes sideways, STOP and re-plan immediately – don't keep pushing
-- Use plan mode for verification steps, not just building
-- Write detailed specs upfront to reduce ambiguity
-
-### 2. Subagent Strategy
-- Use subagents liberally to keep main context window clean
-- Offload research, exploration, and parallel analysis to subagents
-- For complex problems, throw more compute at it via subagents
-- One tack per subagent for focused execution
-
-#### Subagent prompt construction — always include a "Read first" block
-
-Subagents inherit CLAUDE.md and global rules but NOT conversation context. Inject the right files or they will make expensive, already-solved mistakes.
-
-| Agent touches | Must include in prompt |
-|---|---|
-| Any test file | `tasks/lessons.md` — mandatory, prevents Jest/Angular config loops |
-| Any feature work | `tasks/todo.md` — sprint context |
-| Backend routes or middleware | `docs/CODEMAPS/backend.md` — route tree, request/response specs, middleware chain |
-| Database queries or schema | `docs/CODEMAPS/data.md` — ER diagram, constraints, query patterns |
-| New component or route | `docs/CODEMAPS/frontend.md` — component hierarchy, lazy routes, service APIs |
-| Architectural scope | `docs/CODEMAPS/INDEX.md` — system overview + cross-references |
-
-Targeted context beats blanket context. Only inject what's relevant to the task — reading `lessons.md` costs ~3-4k tokens upfront but prevents 20-30k token debugging loops.
-
-### 3. Self-Improvement Loop
-- After ANY correction from the user: update `tasks/lessons.md` with the pattern
-- Write rules for yourself that prevent the same mistake
-- Ruthlessly iterate on these lessons until mistake rate drops
-- Review lessons at session start for relevant project
-- Proactively capture better patterns discovered through research or experience — do not wait for user correction
-
-#### Lesson capture quality gate
-
-Before writing any lesson, it must pass ALL three checks:
-1. **Evidence** — observed working in this codebase (tests passed, build succeeded, user confirmed) OR from a citable external source. Never "I think" or "generally recommended"
-2. **Specific** — names the exact file, function, or pattern. No vague generalisations
-3. **Net new** — not already covered by CLAUDE.md or existing lessons
-
-If any check fails: do not write the lesson. Unverified lessons compound into bad decisions faster than no lessons at all.
-
-### 4. Verification Before Done
-- Never mark a task complete without proving it works
-- Diff behavior between main and your changes when relevant
-- Ask yourself: "Would a staff engineer approve this?"
-- Run tests, check logs, demonstrate correctness
-
-### 5. Demand Elegance (Balanced)
-- For non-trivial changes: pause and ask "is there a more elegant way?"
-- If a fix feels hacky: "Knowing everything I know now, implement the elegant solution"
-- Skip this for simple, obvious fixes – don't over-engineer
-- Challenge your own work before presenting it
-
-### 6. Autonomous Bug Fixing
-- When given a bug report: just fix it. Don't ask for hand-holding
-- Point at logs, errors, failing tests – then resolve them
-- Zero context switching required from the user
-- Go fix failing CI tests without being told how
+**Stack:** Angular 17 (standalone) · Node/Express · PostgreSQL
+**Phase:** Phase 4 — Deployment Readiness (see `tasks/todo.md`)
 
 ---
 
-## Task Management
+## Armoury Link
 
-1. **Plan First**: Write plan to `tasks/todo.md` with checkable items
-2. **Verify Plan**: Check in before starting implementation
-3. **Track Progress**: Mark items complete as you go
-4. **Explain Changes**: High-level summary at each step
-5. **Document Results**: Add review section to `tasks/todo.md`
-6. **Capture Lessons**: Update `tasks/lessons.md` after corrections
+Local specialists are loaded from `.claude/agents/` — these override global agent definitions for this project.
 
----
+| Specialist | File | Role |
+| :--- | :--- | :--- |
+| `typescript-reviewer` | `.claude/agents/typescript-reviewer.md` | Angular/UI + Node/API review |
+| `architect` | `.claude/agents/architect.md` | System design, ADRs, cross-cutting decisions |
+| `code-reviewer` | `.claude/agents/code-reviewer.md` | General code quality + PRs |
+| `security-reviewer` | `.claude/agents/security-reviewer.md` | Auth, API, input validation |
 
-## Core Principles
-
-- **Simplicity First**: Make every change as simple as possible. Impact minimal code.
-- **No Laziness**: Find root causes. No temporary fixes. Senior developer standards.
-- **Minimal Impact**: Changes should only touch what's necessary. Avoid introducing bugs.
+Armoury source: `/Users/alexbeattie/development/AI-Armoury/02-Specialists/`
 
 ---
 
-## Project: KLUB — Run Club Discovery Platform
+## Orchestration
 
-### What it is
-Mobile-first PWA for discovering and managing local run clubs. Runners discover and join runs. Organisers post and manage runs with attendee tracking. Clubs are optional — organisers can post independent runs.
+- Enter plan mode for any task touching 3+ files or crossing frontend/backend boundary
+- Delegate to subagents; inject relevant CODEMAPS context explicitly
+- Never mark done without running `/verify` or `/tdd`
 
-### Tech stack
-- **Frontend**: Angular 17, standalone components, SCSS, Google Maps JS API, PWA
-- **Backend**: Node.js, Express, TypeScript, PostgreSQL, JWT auth, bcrypt
-- **Monorepo**: npm workspaces, root package.json with concurrently
-- **Testing**: Jest on both frontend and backend
-- **Hosting**: Netlify (frontend), Render (backend + PostgreSQL)
+| Domain | Agent | Context File |
+| :--- | :--- | :--- |
+| Angular/UI | `typescript-reviewer` | `docs/CODEMAPS/frontend.md` |
+| Node/API | `typescript-reviewer` | `docs/CODEMAPS/backend.md` |
+| Database | `database-reviewer` | `docs/CODEMAPS/data.md` |
+| Testing | `tdd-guide` | `tasks/lessons.md` |
+| Full-stack | `/multi-execute` | both frontend + backend |
 
-### Structure
-```
-klub/
-├── frontend/          ← Angular 17 PWA
-├── backend/           ← Node/Express API
-├── tasks/             ← todo.md + lessons.md
-├── package.json       ← monorepo root
-├── .env               ← all secrets (gitignored)
-├── generate-env.js    ← generates environment.ts from .env before build
-└── .gitignore
-```
+---
 
-### Commands
-```bash
-npm run dev              # start both frontend and backend
-npm run test:backend     # jest — 87 tests, 5 suites
-npm run test:frontend    # jest — 110 tests total
-npm run build:frontend   # generates env then ng build
-npm run build:backend    # tsc
-npm run db:seed          # seed local DB with test data (TRUNCATES first)
-```
+## Hard Rules [DO NOT DEVIATE]
 
-### Database
-- **Local**: klubdb / klubuser / klubpass on localhost:5432
-- **Schema**: `backend/src/db/schema.sql` — canonical, includes all migrations, use for fresh installs
-- **Migrations**: `migration-001.sql` (club_members, pace/tags), `migration-002.sql` (refresh_tokens), `migration-003.sql` (password_reset_tokens), `migration-004.sql` (run_type)
-- **Tables**: users, clubs, club_members, run_events, run_attendees, refresh_tokens, password_reset_tokens
-- **Seed**: `npm run db:seed` — 5 users, 2 clubs, 7 runs, 14 attendees (TRUNCATES — dev only)
-- Migrations are manual SQL files — run individual files against existing DB with `psql`
+**Frontend**
+- Angular 17 standalone only — no NgModules
+- Signals for state, `inject()` for DI, inline templates/styles
+- Static routes before parameterised routes in router config
 
-### Permissions model
-| Action                   | Runner | Organiser | Club Owner |
-|--------------------------|--------|-----------|------------|
-| Join run                 | ✅     | ✅        | ✅         |
-| Create run (independent) | ❌     | ✅        | ✅         |
-| Create club              | ❌     | ✅        | ✅         |
-| Attach run to club       | ❌     | ❌        | ✅         |
+**Backend**
+- Node / Express / PostgreSQL
+- DB migrations: manual SQL files in `backend/src/db/` (numbered migration-00N.sql)
+- `schema.sql` is canonical for fresh installs only — never run against existing prod DB
 
-Backend enforces all permissions. Frontend controls visibility only.
+**Testing**
+- Jest 29 throughout; see `tasks/lessons.md` for exact setup — do not modify `setup-jest.ts` or `jest.config.js`
+- No `HttpClientTestingModule` — use `provideHttpClient()` + `provideHttpClientTesting()`
+- No `RouterTestingModule` — use `provideRouter([])`
+- Every spec: `TestBed.resetTestingModule()` before `configureTestingModule()`
 
-### API endpoints
-See `docs/CODEMAPS/backend.md` for the full route tree with request/response specs.
+---
 
-### Angular patterns — DO NOT DEVIATE
-- **Standalone components only** — no NgModules anywhere
-- **Signals** for state (`signal()`, `computed()`, `.set()`, `.update()`)
-- **`inject()` function** — not constructor injection
-- **Lazy loading**: `loadComponent: () => import(...).then(m => m.ComponentName)`
-- **Route ordering**: static routes (`clubs/create`, `clubs/create-run`) MUST come before parameterised (`clubs/:id`)
-- **Inline templates and styles** in component decorator — no separate .html/.css files
+## Key Files
 
-### Test patterns — DO NOT DEVIATE
-These patterns were debugged extensively. Do not change test infrastructure without reading `tasks/lessons.md` first.
+| File | Purpose |
+| :--- | :--- |
+| `tasks/todo.md` | Absolute source of truth for sprint work |
+| `tasks/lessons.md` | Hard-won patterns — read before touching tests or routing |
+| `tasks/roadmap.md` | Post-launch roadmap (not auto-loaded) |
+| `docs/CODEMAPS/INDEX.md` | Codebase map index |
 
-**Frontend (Jest + jest-preset-angular@14 + Angular 17):**
-- `setup-jest.ts` does manual `TestBed.initTestEnvironment()` — does NOT import `jest-preset-angular/setup-jest`
-- Every spec: `TestBed.resetTestingModule()` BEFORE `TestBed.configureTestingModule()`
-- Use `provideHttpClient()` + `provideHttpClientTesting()` — NOT `HttpClientTestingModule`
-- Use `provideRouter([])` — NOT `RouterTestingModule`
-- `tsconfig.spec.json` types: `["jest"]` — NOT `["jasmine"]`
-- `jest.config.js` uses `setupFiles` key — NOT `setupFilesAfterSetup` or `setupFilesAfterFramework`
-- All versions pinned to 29.x: jest, jest-environment-jsdom, @types/jest, ts-jest
+---
 
-**Backend (Jest + ts-jest@29):**
-- `tsconfig.test.json` extends `tsconfig.json`, adds `"jest"` to types, includes test files
-- `package.json` jest config uses `transform` with `ts-jest` pointing to `tsconfig.test.json`
-- Tests mock `../../db` with `jest.mock()` and use supertest
+## Continuous Learning
 
-### File maps
-See `docs/CODEMAPS/frontend.md` for component hierarchy, routes, and service APIs.
-See `docs/CODEMAPS/backend.md` for backend file organisation and middleware chain.
-
-### Brand
-- Primary green: `#1D9E75`
-- Light green: `#E1F5EE`
-- Dark green: `#0F6E56`
-- Near-black: `#0D0D0D`
-- Surface: `#F7F7F5`
-- Font: Inter
-- Tagline: "Outrun the algorithm."
-
-### Style rules
-- UK English throughout
-- Direct, clear — no filler or fluff
-- Complete working files in cases of multiple changes throughout same file — never partial snippets
-- Separate code blocks per file when showing multiple files
-
-### Environment variables
-See `docs/CODEMAPS/dependencies.md` for full env var list. Local DB: `klubdb / klubuser / klubpass @ localhost:5432`.
-
-### Known issues
-1. PWA service worker: intermittent 404 on ngsw-worker.js
-2. PWA manifest: occasionally not served correctly on Netlify
-3. Backend clubs.routes tests: still testing old 3-endpoint version, need updating
-4. No error boundary on frontend — unhandled API errors show in console only
-5. club_members.role supports 'member' | 'organizer' | 'owner' but only 'owner' enforced
-
-### Current phase
-See `tasks/todo.md` for active sprint and task queue.
-See `tasks/lessons.md` for patterns, gotchas, and mistakes to avoid.
-
-### Session history
-Full Phase 1 + 2 debugging happened in a claude.ai chat session (22 March 2026). Every Jest/Angular configuration gotcha is documented in `tasks/lessons.md`. Do NOT attempt to change jest config, `setup-jest.ts`, `tsconfig.spec.json`, or any test infrastructure without reading `tasks/lessons.md` first.
+- After fixing a complex bug: run `/learn-eval` and update `tasks/lessons.md`
+- After a correction from the user: update `tasks/lessons.md` with the pattern

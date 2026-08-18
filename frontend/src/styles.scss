@@ -1,12 +1,82 @@
 @use 'styles/klub-theme' as t;
+
+/* ── Design tokens (runtime CSS custom properties) ──────────────────
+   Single source of truth for inline component styles, which cannot
+   @use the SCSS theme. Reference as var(--klub-green) etc. */
+:root {
+  --klub-green: #{t.$klub-green};
+  --klub-green-light: #{t.$klub-green-light};
+  --klub-green-dark: #{t.$klub-green-dark};
+  --klub-green-deep: #{t.$klub-green-deep};
+  --klub-black: #{t.$klub-black};
+  --klub-surface: #{t.$klub-surface};
+  --klub-white: #{t.$klub-white};
+  --klub-border: #{t.$klub-border};
+  --klub-muted: #{t.$klub-muted};
+  --klub-focus-ring: #{t.$klub-green};
+
+  /* Elevation scale — shadows tinted to the warm-neutral brand black */
+  --shadow-xs: 0 1px 2px rgba(13, 13, 12, 0.05);
+  --shadow-card: 0 1px 2px rgba(13, 13, 12, 0.04), 0 4px 14px rgba(13, 13, 12, 0.06), 0 0 0 0.5px rgba(13, 13, 12, 0.05);
+  --shadow-card-hover: 0 2px 4px rgba(13, 13, 12, 0.05), 0 10px 28px rgba(13, 13, 12, 0.10), 0 0 0 0.5px rgba(13, 13, 12, 0.05);
+  --shadow-overlay: 0 8px 32px rgba(13, 13, 12, 0.16), 0 2px 8px rgba(13, 13, 12, 0.08);
+
+  /* Radius scale */
+  --radius-input: 12px;
+  --radius-button: 12px;
+  --radius-card: 16px;
+  --radius-sheet: 24px;
+  --radius-pill: 999px;
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { -webkit-text-size-adjust: 100%; }
 html, body {
   height: 100%; font-family: t.$font-sans; font-size: 16px;
   color: t.$klub-black; background: t.$klub-surface;
   -webkit-font-smoothing: antialiased; overscroll-behavior: none;
+  font-feature-settings: 'cv05', 'cv11'; // Inter: open l + single-storey a for a friendlier voice
 }
 a { color: inherit; text-decoration: none; }
+a, button { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+
+/* ── Desktop backdrop ───────────────────────────────────────────────
+   The app renders as a centred column on large screens (see app.component).
+   The page behind it gets a branded dark field with a soft green glow. */
+@media (min-width: 768px) {
+  body {
+    background:
+      radial-gradient(900px 600px at 70% -10%, rgba(29, 158, 117, 0.22), transparent 60%),
+      radial-gradient(700px 500px at 10% 110%, rgba(8, 80, 65, 0.35), transparent 55%),
+      #0D0D0D;
+  }
+}
+h1, h2, h3 { letter-spacing: -0.015em; text-wrap: balance; }
 input, textarea, select { font-family: t.$font-sans; font-size: 16px; }
+::selection { background: t.$klub-green-light; color: t.$klub-green-deep; }
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 2px; }
 .pac-container { z-index: 9999 !important; }
+
+/* ── Accessibility: visible keyboard focus ──────────────────────────
+   Applies only to keyboard users (not mouse clicks). Components that
+   set outline:none still get a ring here. */
+:focus-visible {
+  outline: 2px solid var(--klub-focus-ring);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* ── Accessibility: respect reduced-motion preference ───────────────
+   Neutralises transitions/animations (e.g. the run-card pulse dot). */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -1,255 +1,199 @@
-<!-- Generated: 2026-03-23 | Files scanned: 6 | Token estimate: ~380 -->
+<!-- Generated: 2026-03-29 | Files scanned: 9 | Token estimate: ~420 -->
 
 # Database Schema Codemap
 
-**Last Updated:** 2026-03-23
-**Sources:** `backend/src/db/schema.sql` (canonical — all migrations consolidated) | `backend/src/db/migration-001.sql` through `migration-004.sql`
+**Last Updated:** 2026-03-29
+**Sources:** `backend/src/db/schema.sql` (canonical) | migrations 001–005
 
 ## Tables & Relationships
 
 ```
-┌──────────────────┐
-│     users        │
-├──────────────────┤
-│ id (UUID) PK     │
-│ display_name     │
-│ email (unique)   │
-│ password_hash    │
-│ role             │◄─┐ 'runner' | 'organizer'
-│ strava_connected │  │
-│ created_at       │  │
-└──────────────────┘  │
-      ▲               │
-      │ owner_id      │
-      │               │
-   ┌──┴──────────────────┐
-   │      clubs          │
-   ├─────────────────────┤
-   │ id (UUID) PK        │
-   │ name                │
-   │ description         │
-   │ owner_id (FK→users) │
-   │ city                │  ┌──────────────────────┐
-   │ pace                │  │   club_members       │
-   │ tags (array)        │  ├──────────────────────┤
-   │ logo_url            │  │ club_id (FK) ◄──────┤
-   │ member_count (cache)│◄─┤ user_id (FK) ┐      │
-   │ created_at          │  │ role         │      │
-   └─────────────────────┘  │ joined_at    │      │
-      ▲                     └──────────────┼──────┘
-      │ club_id (nullable)                │
-      │                          ┌────────┘
-   ┌──┴──────────────────┐      │
-   │   run_events        │      │
-   ├─────────────────────┤      │
-   │ id (UUID) PK        │      │
-   │ club_id (FK, NULL)  │      │
-   │ club_name           │      │
-   │ title               │      │
-   │ start_lat, start_lng│      │
-   │ end_lat, end_lng    │      │
-   │ start_address       │      │
-   │ end_address         │      │
-   │ event_date          │      │
-   │ distance_km         │      │
-   │ estimated_minutes   │      │
-   │ max_attendees       │      │
-   │ notes               │      │
-   │ status              │      │
-   │ pace, tags (array)  │      │
-   │ created_by (FK)─────┼──────┘
-   │ created_at          │
-   └──────────────────────┘
-       ▲ ├─ run_id (FK)
-       │ │
-       │ ┌────────────────────────┐
-       │ │   run_attendees        │
-       │ ├────────────────────────┤
-       │ │ run_id (FK) ◄──────────┤
-       │ │ user_id (FK) ──────────┼──► users(id)
-       │ │ joined_at              │
-       │ │ PK: (run_id, user_id)  │
-       │ └────────────────────────┘
-       │
-       └──────────────────────────────► created_by (FK→users)
+┌──────────────────────────────┐
+│           users              │
+├──────────────────────────────┤
+│ id (UUID) PK                 │
+│ display_name                 │
+│ email (unique)               │
+│ password_hash                │
+│ role (runner|organizer)      │
+│ strava_athlete_id (BIGINT)   │◄── Strava integration
+│ strava_access_token          │
+│ strava_refresh_token         │
+│ strava_token_expires_at      │
+│ strava_connected (BOOL)      │
+│ created_at                   │
+└──────────────────────────────┘
+      ▲ owner_id
+      │
+┌─────┴───────────────┐    ┌──────────────────────┐
+│       clubs         │    │    club_members       │
+├─────────────────────┤    ├──────────────────────┤
+│ id (UUID) PK        │◄───┤ club_id (FK)          │
+│ name, description   │    │ user_id (FK)          │
+│ owner_id (FK→users) │    │ role (member|org|own) │
+│ city, pace          │    │ joined_at             │
+│ tags (TEXT[])       │    └──────────────────────┘
+│ logo_url            │
+│ member_count (cache)│
+│ created_at          │
+└──────────┬──────────┘
+           │ club_id (nullable)
+┌──────────▼──────────────────────┐
+│         run_events              │
+├─────────────────────────────────┤
+│ id (UUID) PK                    │
+│ club_id (FK→clubs, SET NULL)    │
+│ club_name (denormalized)        │
+│ title                           │
+│ start_lat, start_lng            │
+│ end_lat, end_lng                │
+│ start_address, end_address      │
+│ event_date (UTC)                │
+│ distance_km, estimated_minutes  │
+│ max_attendees (nullable)        │
+│ notes, status                   │
+│ pace, tags (TEXT[])             │
+│ run_type (CHECK constraint)     │
+│ created_by (FK→users)          │
+│ created_at                      │
+└───────────────┬─────────────────┘
+                │ run_id
+┌───────────────▼─────────────────────────┐
+│            run_attendees                │
+├─────────────────────────────────────────┤
+│ run_id (FK) PK                          │
+│ user_id (FK→users) PK                   │
+│ joined_at                               │
+│ strava_activity_id (BIGINT)             │◄── Strava link
+│ strava_distance (FLOAT)                 │
+│ strava_moving_time (INTEGER)            │
+│ strava_average_speed (FLOAT)            │
+│ strava_polyline (TEXT)                  │
+└─────────────────────────────────────────┘
 ```
 
 ## Table Definitions
 
-### users (schema.sql:3–12)
+### users (schema.sql)
 
-| Column           | Type          | Constraints                     | Notes                |
-|------------------|---------------|---------------------------------|----------------------|
-| id               | UUID          | PK, DEFAULT uuid_generate_v4()  |                      |
-| display_name     | VARCHAR(100)  | NOT NULL                        | User's visible name  |
-| email            | VARCHAR(255)  | UNIQUE NOT NULL                 |                      |
-| password_hash    | VARCHAR(255)  | NOT NULL                        | bcryptjs hashed      |
-| role             | VARCHAR(20)   | NOT NULL, DEFAULT 'runner'      | CHECK: runner\|organizer |
-| strava_connected | BOOLEAN       | DEFAULT false                   | Future feature       |
-| created_at       | TIMESTAMP     | DEFAULT NOW()                   |                      |
+| Column                  | Type          | Constraints              | Notes                    |
+|-------------------------|---------------|--------------------------|--------------------------|
+| id                      | UUID          | PK, DEFAULT uuid_generate | |
+| display_name            | VARCHAR(100)  | NOT NULL                 |                          |
+| email                   | VARCHAR(255)  | UNIQUE NOT NULL          |                          |
+| password_hash           | VARCHAR(255)  | NOT NULL                 | bcryptjs, 12 rounds      |
+| role                    | VARCHAR(20)   | DEFAULT 'runner'         | CHECK: runner\|organizer |
+| strava_athlete_id       | BIGINT        | UNIQUE, nullable         | Set on OAuth connect     |
+| strava_access_token     | TEXT          | nullable                 | Short-lived token        |
+| strava_refresh_token    | TEXT          | nullable                 | Long-lived refresh       |
+| strava_token_expires_at | TIMESTAMP     | nullable                 | Refresh when expired     |
+| strava_connected        | BOOLEAN       | DEFAULT false            |                          |
+| created_at              | TIMESTAMP     | DEFAULT NOW()            |                          |
 
-**Indexes:** Primary key on id, unique on email (implicit)
+### clubs (schema.sql + migration-001)
 
-### clubs (schema.sql:14–21, migration-001.sql:13–17)
+| Column       | Type         | Notes                                 |
+|--------------|--------------|---------------------------------------|
+| id           | UUID PK      |                                       |
+| name         | VARCHAR(100) | NOT NULL                              |
+| description  | TEXT         |                                       |
+| owner_id     | UUID FK      | → users CASCADE                       |
+| city         | VARCHAR(100) | migration-001                         |
+| pace         | VARCHAR(20)  | migration-001                         |
+| tags         | TEXT[]       | DEFAULT '{}' migration-001            |
+| logo_url     | TEXT         | migration-001                         |
+| member_count | INTEGER      | DEFAULT 0 (cached, recomputed at query)|
+| created_at   | TIMESTAMP    | DEFAULT NOW()                         |
 
-| Column       | Type          | Constraints           | Notes                |
-|--------------|---------------|-----------------------|----------------------|
-| id           | UUID          | PK                    |                      |
-| name         | VARCHAR(100)  | NOT NULL              |                      |
-| description  | TEXT          |                       |                      |
-| owner_id     | UUID          | FK→users, CASCADE     | Club creator         |
-| city         | VARCHAR(100)  | (migration-001)       | Filtering support    |
-| pace         | VARCHAR(20)   | (migration-001)       | e.g., "4:30/km"      |
-| tags         | TEXT[]        | DEFAULT '{}' (migration-001) | Array of strings |
-| logo_url     | TEXT          | (migration-001)       | Future: club image   |
-| member_count | INTEGER       | DEFAULT 0 (schema)    | Cached value         |
-| created_at   | TIMESTAMP     | DEFAULT NOW()         |                      |
+### club_members (migration-001)
+- PK: (club_id, user_id)
+- role: 'member' | 'organizer' | 'owner' (DEFAULT 'member')
+- joined_at: TIMESTAMP DEFAULT NOW()
 
-**Computed fields in API:**
-- member_count: SELECT COUNT(*) FROM club_members (query-time)
-- next_run_date: SELECT MIN(event_date) FROM run_events (query-time)
+### run_events (schema.sql + migration-001 + migration-004)
 
-### club_members (migration-001.sql:4–11)
+| Column            | Type          | Notes                                         |
+|-------------------|---------------|-----------------------------------------------|
+| club_id           | UUID FK       | → clubs SET NULL (run survives club deletion) |
+| club_name         | VARCHAR(100)  | Denormalized — avoids join in list queries    |
+| run_type          | VARCHAR(30)   | CHECK: club_run\|parkrun_style\|one_off_race\|training_group\|trail_run |
+| start/end coords  | DECIMAL(10,8) | 8 decimal precision                           |
+| status            | VARCHAR(20)   | DEFAULT 'active' (active\|cancelled)          |
+| pace, tags        | TEXT[]        | migration-001                                 |
+| created_by        | UUID FK       | → users (no CASCADE — preserve history)       |
 
-| Column   | Type       | Constraints          | Notes              |
-|----------|----------|----------------------|--------------------|
-| club_id  | UUID     | FK→clubs, CASCADE    | Junction table PK  |
-| user_id  | UUID     | FK→users, CASCADE    | Junction table PK  |
-| role     | VARCHAR  | DEFAULT 'member'     | 'member'\|'organizer'\|'owner' |
-| joined_at| TIMESTAMP| DEFAULT NOW()        |                    |
+### run_attendees (schema.sql + migration-005)
+- PK: (run_id, user_id)
+- joined_at: TIMESTAMP DEFAULT NOW()
+- strava_activity_id: BIGINT (nullable — set when user links Strava activity)
+- strava_distance: FLOAT (metres from Strava)
+- strava_moving_time: INTEGER (seconds from Strava)
+- strava_average_speed: FLOAT (m/s from Strava)
+- strava_polyline: TEXT (encoded polyline from Strava)
 
-**Unique constraint:** (club_id, user_id) composite PK
-**Usage:** Track club membership, enforce creation permissions via role
+### Auth Tables (migration-002, migration-003)
 
-### run_events (schema.sql:23–42, migration-001.sql:19–21)
+**refresh_tokens**
+- user_id (FK→users CASCADE), token_hash (TEXT), expires_at (TIMESTAMP 30d)
+- Indexes: user_id, token_hash
 
-| Column           | Type          | Constraints          | Notes                    |
-|------------------|---------------|----------------------|--------------------------|
-| id               | UUID          | PK                   |                          |
-| club_id          | UUID          | FK→clubs, SET NULL   | Nullable: run can be independent |
-| club_name        | VARCHAR(100)  | NOT NULL             | Denormalized for queries |
-| title            | VARCHAR(200)  | NOT NULL             |                          |
-| start_lat        | DECIMAL(10,8) | NOT NULL             | Precision: 6 decimals    |
-| start_lng        | DECIMAL(11,8) | NOT NULL             |                          |
-| end_lat          | DECIMAL(10,8) | NOT NULL             |                          |
-| end_lng          | DECIMAL(11,8) | NOT NULL             |                          |
-| start_address    | TEXT          | NOT NULL             | Reverse geocoded         |
-| end_address      | TEXT          | NOT NULL             |                          |
-| event_date       | TIMESTAMP     | NOT NULL             | UTC timestamp            |
-| distance_km      | DECIMAL(6,2)  | NOT NULL             |                          |
-| estimated_minutes| INTEGER       | NOT NULL             | Duration estimate        |
-| max_attendees    | INTEGER       | Nullable             | NULL = unlimited         |
-| notes            | TEXT          | Nullable             |                          |
-| status           | VARCHAR(20)   | DEFAULT 'active'     | 'active'\|'cancelled'    |
-| pace             | VARCHAR(20)   | (migration-001)      | e.g., "4:30/km"          |
-| tags             | TEXT[]        | DEFAULT '{}' (migration-001) | Array of strings |
-| run_type         | VARCHAR(30)   | CHECK constraint (migration-004) | club_run\|parkrun_style\|one_off_race\|training_group\|trail_run |
-| created_by       | UUID          | FK→users             | Organizer who created    |
-| created_at       | TIMESTAMP     | DEFAULT NOW()        |                          |
+**password_reset_tokens**
+- user_id (FK→users CASCADE), token_hash (TEXT), expires_at (TIMESTAMP 1h), used (BOOLEAN DEFAULT false)
+- Indexes: token_hash, user_id
 
-**Denormalization:** club_name stored to avoid join in list queries
-**Indexes needed:** created_by, club_id, event_date, status (not declared in schema)
+### strava_webhooks (migration-005 — future feature)
+- user_id (FK→users), event_type (VARCHAR), payload (JSONB)
+- Not yet used in application logic
 
-### run_attendees (schema.sql:44–48)
+## Key Query Patterns
 
-| Column  | Type      | Constraints       | Notes            |
-|---------|-----------|-------------------|------------------|
-| run_id  | UUID      | FK→run_events, CASCADE | Junction PK  |
-| user_id | UUID      | FK→users, CASCADE | Junction PK      |
-| joined_at| TIMESTAMP| DEFAULT NOW()     |                  |
-
-**Unique constraint:** (run_id, user_id) composite PK
-**Usage:** Track who has joined a run (toggleable many-to-many)
-
-## Query Patterns
-
-### List Runs with Attendees (runs.routes.ts:56–61)
+### List Runs with Attendees
 ```sql
 SELECT r.*,
   COALESCE(json_agg(ra.user_id) FILTER (WHERE ra.user_id IS NOT NULL), '[]') AS attendees
 FROM run_events r
 LEFT JOIN run_attendees ra ON ra.run_id = r.id
-WHERE r.status = 'active' [+ optional filters]
+WHERE r.status = 'active' [+ dynamic filters]
 GROUP BY r.id
 ORDER BY r.event_date ASC
 ```
 
-**Note:** Parameterized filters (distance_min, date ranges, city ILIKE, pace)
-
-### Club Ownership Verification (runs.routes.ts:117–130)
+### Club Ownership Verification
 ```sql
-SELECT c.id, c.name
-FROM clubs c
+SELECT c.id FROM clubs c
 LEFT JOIN club_members cm ON cm.club_id = c.id AND cm.user_id = $2
-WHERE c.id = $1
-  AND (
-    c.owner_id = $2
-    OR cm.role IN ('owner', 'organizer')
-  )
+WHERE c.id = $1 AND (c.owner_id = $2 OR cm.role IN ('owner', 'organizer'))
 ```
 
-**Enforces:** Only club owner or club organizers can create runs for that club
-
-### List Clubs with Metadata (clubs.routes.ts:10–15)
+### List Clubs with Metadata
 ```sql
 SELECT c.*,
   (SELECT COUNT(*) FROM club_members cm WHERE cm.club_id = c.id)::int AS member_count,
   (SELECT MIN(r.event_date) FROM run_events r
    WHERE r.club_id = c.id AND r.status = 'active' AND r.event_date > NOW()) AS next_run_date
-FROM clubs c
-ORDER BY c.created_at DESC
+FROM clubs c ORDER BY c.created_at DESC
 ```
-
-## Constraints & Integrity
-
-| Entity | Constraint | Enforcement | Notes |
-|--------|-----------|-------------|-------|
-| users.role | CHECK (role IN ('runner', 'organizer')) | DB | Enforced at DB level |
-| clubs | owner_id references users | FK CASCADE | Delete user → delete clubs |
-| run_events | club_id references clubs | FK SET NULL | Delete club → orphan runs |
-| club_members | (club_id, user_id) UNIQUE | PK | Prevent duplicate membership |
-| run_attendees | (run_id, user_id) UNIQUE | PK | Prevent duplicate joins |
-
-## Auth Tables (Phase 4)
-
-### refresh_tokens
-| Column      | Type       | Constraints        | Notes                        |
-|-------------|------------|--------------------|------------------------------|
-| id          | UUID       | PK                 |                              |
-| user_id     | UUID       | FK→users CASCADE   |                              |
-| token_hash  | TEXT       | NOT NULL           | bcrypt-hashed refresh token  |
-| expires_at  | TIMESTAMP  | NOT NULL           | 30-day expiry                |
-| created_at  | TIMESTAMP  | DEFAULT NOW()      |                              |
-
-### password_reset_tokens
-| Column      | Type       | Constraints        | Notes                              |
-|-------------|------------|--------------------|-------------------------------------|
-| id          | UUID       | PK                 |                                     |
-| user_id     | UUID       | FK→users CASCADE   |                                     |
-| token_hash  | TEXT       | NOT NULL           | bcrypt-hashed reset token           |
-| expires_at  | TIMESTAMP  | NOT NULL           | Short-lived (1h)                    |
-| used        | BOOLEAN    | DEFAULT false      | One-time use flag                   |
-| created_at  | TIMESTAMP  | DEFAULT NOW()      |                                     |
 
 ## Migrations
 
-| File | Contents |
-|------|----------|
-| schema.sql | Canonical — all 4 migrations consolidated. Use for fresh installs. |
+| File              | Contents                                                          |
+|-------------------|-------------------------------------------------------------------|
+| schema.sql        | Canonical consolidated schema — use for **fresh installs only**  |
 | migration-001.sql | club_members table; city/pace/tags/logo_url on clubs; pace/tags on run_events |
-| migration-002.sql | refresh_tokens table |
-| migration-003.sql | password_reset_tokens table |
-| migration-004.sql | run_type VARCHAR(30) on run_events with CHECK constraint |
+| migration-002.sql | Strava token columns on users table                              |
+| migration-003.sql | run_type CHECK constraint on run_events                          |
+| migration-004.sql | password_reset_tokens + refresh_tokens tables                    |
+| migration-005.sql | Strava columns on run_attendees; strava_webhooks table           |
 
-> Run individual migration files (not schema.sql) against an existing production DB.
+> Run individual migration files against existing DB. Never run schema.sql against production.
 
 ## Performance Notes
 
-- **Denormalized club_name** in run_events avoids join in list queries
-- **Computed member_count** at query-time (not cached after insert)
-- **json_agg(attendees)** expensive for large runs; pagination not implemented
-- **11 indexes declared** in schema.sql — event_date, club_id, created_by, status, run_type, user email, club_members, run_attendees
-- **ILIKE filters** on title/club_name/start_address covered by indexes
+- **Denormalized club_name** on run_events avoids join in list queries
+- **json_agg(attendees)** expensive for large runs — no pagination yet
+- **11 indexes** declared in schema.sql: event_date, club_id, created_by, status, run_type, email, club_members PK, run_attendees PK
+- **ILIKE filters** on title/club_name/start_address (full-text index not yet added)
+- **Strava tokens** stored in plaintext — consider encrypting at rest
 
 ## Related Codemaps
 - [backend.md](backend.md) — SQL queries, API implementation

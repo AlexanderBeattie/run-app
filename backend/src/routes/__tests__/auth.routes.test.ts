@@ -82,6 +82,16 @@ describe('POST /api/auth/register', () => {
     expect(res.status).toBe(201);
     expect(res.body.user.role).toBe('runner');
   });
+
+  it('returns 500 on database error', async () => {
+    mockPool
+      .mockResolvedValueOnce({ rows: [] })           // email check passes
+      .mockRejectedValueOnce(new Error('DB error')); // INSERT fails
+    const res = await request(app).post('/api/auth/register').send({
+      displayName: 'Test', email: 'test@test.com', password: 'password123'
+    });
+    expect(res.status).toBe(500);
+  });
 });
 
 describe('POST /api/auth/login', () => {
@@ -109,6 +119,31 @@ describe('POST /api/auth/login', () => {
       email: 'test@test.com', password: 'wrongpassword'
     });
     expect(res.status).toBe(401);
+  });
+
+  it('returns 200 with token and refreshToken on valid credentials', async () => {
+    const bcrypt = await import('bcryptjs');
+    const passwordHash = await bcrypt.hash('correctpassword', 1);
+    mockPool
+      .mockResolvedValueOnce({ rows: [{ id: 'user-1', display_name: 'Test', email: 'test@test.com', password_hash: passwordHash, role: 'runner', strava_athlete_id: null }] })
+      .mockResolvedValueOnce({ rows: [] }); // issueRefreshToken INSERT
+    const res = await request(app).post('/api/auth/login').send({
+      email: 'test@test.com', password: 'correctpassword'
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.token).toBeDefined();
+    expect(res.body.refreshToken).toBeDefined();
+    expect(res.body.expiresIn).toBe(3600);
+    expect(res.body.user.role).toBe('runner');
+    expect(res.body.user.stravaConnected).toBe(false);
+  });
+
+  it('returns 500 on database error', async () => {
+    mockPool.mockRejectedValueOnce(new Error('DB error'));
+    const res = await request(app).post('/api/auth/login').send({
+      email: 'test@test.com', password: 'password123'
+    });
+    expect(res.status).toBe(500);
   });
 });
 
@@ -147,6 +182,12 @@ describe('POST /api/auth/refresh', () => {
     expect(res.body.token).toBeDefined();
     expect(res.body.expiresIn).toBe(3600);
   });
+
+  it('returns 500 on database error', async () => {
+    mockPool.mockRejectedValueOnce(new Error('DB error'));
+    const res = await request(app).post('/api/auth/refresh').send({ refreshToken: 'some-token' });
+    expect(res.status).toBe(500);
+  });
 });
 
 describe('POST /api/auth/logout', () => {
@@ -165,5 +206,122 @@ describe('POST /api/auth/logout', () => {
       expect.stringContaining('DELETE FROM refresh_tokens'),
       expect.any(Array)
     );
+  });
+
+  it('returns 500 on database error', async () => {
+    mockPool.mockRejectedValueOnce(new Error('DB error'));
+    const res = await request(app).post('/api/auth/logout').send({ refreshToken: 'some-token' });
+    expect(res.status).toBe(500);
+  });
+});
+
+// ── Forgot Password ────────────────────────────────────────────────────────────
+
+describe('POST /api/auth/forgot-password', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it('returns 400 if email is missing', async () => {
+    const res = await request(app).post('/api/auth/forgot-password').send({});
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('Email required');
+  });
+
+  it('returns 200 for existing email and inserts a reset token', async () => {
+    mockPool
+      .mockResolvedValueOnce({ rows: [{ id: 'user-1' }] }) // SELECT user
+      .mockResolvedValueOnce({ rows: [] });                  // INSERT token
+    const res = await request(app).post('/api/auth/forgot-password').send({ email: 'user@test.com' });
+    expect(res.status).toBe(200);
+    expect(res.body.message).toMatch(/reset link has been sent/i);
+    expect(mockPool).toHaveBeenCalledTimes(2);
+    expect(mockPool).toHaveBeenNthCalledWith(2,
+      expect.stringContaining('INSERT INTO password_reset_tokens'),
+      expect.any(Array)
+    );
+  });
+
+  it('returns 200 for non-existent email (no information leakage)', async () => {
+    mockPool.mockResolvedValueOnce({ rows: [] }); // user not found
+    const res = await request(app).post('/api/auth/forgot-password').send({ email: 'nobody@test.com' });
+    expect(res.status).toBe(200);
+    expect(res.body.message).toMatch(/reset link has been sent/i);
+    // Should NOT have inserted a token
+    expect(mockPool).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns 500 on database error', async () => {
+    mockPool.mockRejectedValueOnce(new Error('DB error'));
+    const res = await request(app).post('/api/auth/forgot-password').send({ email: 'user@test.com' });
+    expect(res.status).toBe(500);
+  });
+});
+
+// ── Reset Password ─────────────────────────────────────────────────────────────
+
+describe('POST /api/auth/reset-password', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it('returns 400 if token is missing', async () => {
+    const res = await request(app).post('/api/auth/reset-password').send({ newPassword: 'newpassword123' });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('Token and new password required');
+  });
+
+  it('returns 400 if newPassword is missing', async () => {
+    const res = await request(app).post('/api/auth/reset-password').send({ token: 'some-token' });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('Token and new password required');
+  });
+
+  it('returns 400 if new password is too short', async () => {
+    const res = await request(app).post('/api/auth/reset-password').send({ token: 'some-token', newPassword: 'short' });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/Password must be/);
+  });
+
+  it('returns 400 if new password exceeds max length', async () => {
+    const res = await request(app).post('/api/auth/reset-password').send({
+      token: 'some-token', newPassword: 'a'.repeat(129)
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/Password must be/);
+  });
+
+  it('returns 400 if token is invalid or expired (no DB row)', async () => {
+    mockPool.mockResolvedValueOnce({ rows: [] });
+    const res = await request(app).post('/api/auth/reset-password').send({
+      token: 'invalid-token', newPassword: 'newpassword123'
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('Invalid or expired reset token');
+  });
+
+  it('updates password and marks token as used on success', async () => {
+    mockPool
+      .mockResolvedValueOnce({ rows: [{ user_id: 'user-1' }] }) // SELECT token
+      .mockResolvedValueOnce({ rows: [] })                        // UPDATE password
+      .mockResolvedValueOnce({ rows: [] });                       // UPDATE token used=true
+    const res = await request(app).post('/api/auth/reset-password').send({
+      token: 'valid-reset-token', newPassword: 'newpassword123'
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.message).toBe('Password updated successfully');
+    expect(mockPool).toHaveBeenCalledTimes(3);
+    expect(mockPool).toHaveBeenNthCalledWith(2,
+      expect.stringContaining('UPDATE users SET password_hash'),
+      expect.any(Array)
+    );
+    expect(mockPool).toHaveBeenNthCalledWith(3,
+      expect.stringContaining('UPDATE password_reset_tokens SET used = true'),
+      expect.any(Array)
+    );
+  });
+
+  it('returns 500 on database error', async () => {
+    mockPool.mockRejectedValueOnce(new Error('DB error'));
+    const res = await request(app).post('/api/auth/reset-password').send({
+      token: 'some-token', newPassword: 'newpassword123'
+    });
+    expect(res.status).toBe(500);
   });
 });

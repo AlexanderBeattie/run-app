@@ -39,7 +39,7 @@ psql klubdb < backend/src/db/migration-001.sql
 
 # 4. Start dev servers
 npm run dev
-# Frontend: http://localhost:4200
+# Frontend: http://localhost:4201
 # Backend:  http://localhost:3000
 ```
 
@@ -51,7 +51,7 @@ PORT=3000
 DATABASE_URL=postgresql://klubuser:klubpass@localhost:5432/klubdb
 JWT_SECRET=
 JWT_EXPIRES_IN=7d
-CORS_ORIGIN=http://localhost:4200
+CORS_ORIGIN=http://localhost:4201
 ```
 
 ---
@@ -61,7 +61,7 @@ CORS_ORIGIN=http://localhost:4200
 | Command | Description |
 |---|---|
 | `npm run dev` | Start frontend + backend concurrently |
-| `npm run dev:frontend` | Angular dev server on :4200 |
+| `npm run dev:frontend` | Angular dev server on :4201 |
 | `npm run dev:backend` | Node API on :3000 |
 | `npm run test:frontend` | Jest — 12 suites, 109 tests |
 | `npm run test:backend` | Jest — backend routes + services |

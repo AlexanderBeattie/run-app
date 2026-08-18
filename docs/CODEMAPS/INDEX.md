@@ -1,8 +1,8 @@
-<!-- Generated: 2026-03-22 | Codemap Index -->
+<!-- Generated: 2026-03-29 | Codemap Index -->
 
 # KLUB Codemap Index
 
-**Last Updated:** 2026-03-22
+**Last Updated:** 2026-03-29
 
 Welcome to the KLUB codebase documentation. These codemaps provide token-lean, single-source-of-truth architectural guides extracted directly from code.
 
@@ -38,12 +38,13 @@ Monorepo structure, HTTP/REST flow, middleware stack, deployment targets.
 Complete route tree with request/response specs for all endpoints.
 
 **Covers:**
-- POST /api/auth/register, /api/auth/login
-- GET /api/runs (with filters), POST /api/runs (with club ownership enforcement)
+- POST /api/auth/register, /api/auth/login, refresh, forgot/reset-password
+- GET /api/runs (with filters + trending), POST /:id/link-strava
 - GET /api/clubs, POST /api/clubs/join
+- GET /api/users/:id/profile, GET /api/users/strava/activities
+- GET /api/strava (OAuth init), GET /api/strava/callback
 - GET /api/geocode (Google API proxy)
-- Middleware chain, JWT verification, error handling
-- File organization and line counts
+- Middleware chain, JWT verification, rate limiting, error handling
 
 **Read this to understand API contracts** before calling endpoints from frontend.
 
@@ -185,7 +186,7 @@ PORT=3000                                 # Express server port
 DATABASE_URL=postgresql://user:pass@...   # PostgreSQL connection
 JWT_SECRET=your-secret-key               # Token signing key
 JWT_EXPIRES_IN=1h                        # JWT lifetime (refresh tokens handle session continuity)
-CORS_ORIGIN=http://localhost:4200        # Production frontend origin
+CORS_ORIGIN=http://localhost:4201        # Production frontend origin
 GOOGLE_SERVER_API_KEY=AIzaSyA...         # Server-side Geocoding API
 ```
 
@@ -197,7 +198,7 @@ See [dependencies.md](dependencies.md#environment-variables) for details.
 
 ```bash
 # Development
-npm run dev              # Start frontend (4200) + backend (3000)
+npm run dev              # Start frontend (4201) + backend (3000)
 npm run build:frontend   # Generate env + ng build
 npm run build:backend    # tsc compile
 

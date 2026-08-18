@@ -30,12 +30,12 @@ describe('authGuard', () => {
     expect(router.navigate).not.toHaveBeenCalled();
   });
 
-  it('redirects to login when not logged in', () => {
+  it('redirects to login with returnUrl when not logged in', () => {
     authService.isLoggedIn.mockReturnValue(false);
     const result = TestBed.runInInjectionContext(() =>
-      authGuard({} as ActivatedRouteSnapshot, {} as RouterStateSnapshot)
+      authGuard({} as ActivatedRouteSnapshot, { url: '/profile' } as RouterStateSnapshot)
     );
     expect(result).toBe(false);
-    expect(router.navigate).toHaveBeenCalledWith(['/login']);
+    expect(router.navigate).toHaveBeenCalledWith(['/login'], { queryParams: { returnUrl: '/profile' } });
   });
 });

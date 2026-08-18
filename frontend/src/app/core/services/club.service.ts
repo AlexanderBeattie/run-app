@@ -15,7 +15,7 @@ export class ClubService {
     getClubRuns(id: string) { return this.http.get<any[]>(`${environment.apiUrl}/clubs/${id}/runs`); }
     getClubMembers(id: string) { return this.http.get<ClubMember[]>(`${environment.apiUrl}/clubs/${id}/members`); }
 
-    createClub(data: { name: string; description?: string; city?: string; pace?: string; tags?: string[] }) {
+    createClub(data: { name: string; description?: string; city?: string; pace?: string; tags?: string[]; logo_url?: string; color?: string }) {
         return this.http.post<Club>(`${environment.apiUrl}/clubs`, data);
     }
 

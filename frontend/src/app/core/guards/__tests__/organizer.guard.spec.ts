@@ -22,13 +22,13 @@ describe('organizerGuard', () => {
     });
   });
 
-  it('redirects to login if not logged in', () => {
+  it('redirects to login with returnUrl if not logged in', () => {
     authService.isLoggedIn.mockReturnValue(false);
     const result = TestBed.runInInjectionContext(() =>
-      organizerGuard({} as ActivatedRouteSnapshot, {} as RouterStateSnapshot)
+      organizerGuard({} as ActivatedRouteSnapshot, { url: '/clubs/create' } as RouterStateSnapshot)
     );
     expect(result).toBe(false);
-    expect(router.navigate).toHaveBeenCalledWith(['/login']);
+    expect(router.navigate).toHaveBeenCalledWith(['/login'], { queryParams: { returnUrl: '/clubs/create' } });
   });
 
   it('redirects to home if runner tries to access organizer route', () => {

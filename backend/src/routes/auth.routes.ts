@@ -80,7 +80,7 @@ router.post('/login', async (req: Request, res: Response) => {
   try {
     // Explicit columns — never SELECT *
     const result = await pool.query(
-      'SELECT id, display_name, email, password_hash, role FROM users WHERE email = $1',
+      'SELECT id, display_name, email, password_hash, role, strava_athlete_id FROM users WHERE email = $1',
       [email],
     );
     const user = result.rows[0];
@@ -97,7 +97,7 @@ router.post('/login', async (req: Request, res: Response) => {
       token,
       refreshToken,
       expiresIn: 3600,
-      user: { id: user.id, displayName: user.display_name, email: user.email, role: user.role },
+      user: { id: user.id, displayName: user.display_name, email: user.email, role: user.role, stravaConnected: !!user.strava_athlete_id },
     });
   } catch (err) {
     console.error(err);

@@ -1,259 +1,138 @@
-# KLUB — Roadmap (post-launch phases)
+# KLUB — Roadmap
 
 > This file is intentionally NOT loaded each session. Reference it when planning Phase 5+.
 > Active sprint lives in `tasks/todo.md`.
 
 ---
 
-## Token estimate tracking
+## Market Context (April 2026)
 
-Format: `[~Xk est]` → updated to `[~Xk est / ~Yk actual]` when a session completes.
-Purpose: calibrate future estimates.
+**Why the timing is right:**
+- 2025 was "Year of the Run Club" — Gen Z choosing run clubs over dating apps (Fortune, Oct 2025)
+- Strava's club count quadrupled to 1M in 2025; 50M MAU; IPO planned
+- Running club participation up 25% over 5 years in the US (Running USA)
+- Recreation clubs market: $64.84B globally, growing at 6.8% CAGR
 
-| Session | Estimated | Actual | Delta |
-|---------|-----------|--------|-------|
-| phase3f (discovery feed frontend) | ~80k | — | — |
-| phase-A1 (run_type end-to-end) | ~10k | — | — |
-| phase4-security (backend + frontend) | ~60k | — | — |
-| phase4-password-reset | ~30k | — | — |
-| *(add row when each session completes)* | | | |
+**KLUB's core thesis, validated:**
+- Strava (100M users) explicitly cannot schedule group runs or invite club members to events — their #1 user complaint
+- No competitor consolidates: local run discovery + event scheduling + social community + organiser tools
+- The entire market splits into "fitness tracker" or "race registration" — nobody owns the daily local group run
 
----
-
-## Shipped (ahead of schedule)
-
-- [x] **phase6-run-type** — `run_type` enum on run_events (club_run / parkrun_style / one_off_race / training_group / trail_run), badge on RunCard, filter pill on HomeComponent, migration-004.sql *(shipped as Phase A1)*
-
----
-
-## Phase 5: Supabase Migration (post-launch)
-
-> Each task below is a dedicated session. Supabase migration is EPIC scope — budget ~250k+ tokens total.
-> Do not start until the app is live and stable on the current stack.
-
-> **Session: phase5-db-migrate [~40k]**
-> Context: `backend/src/db/schema.sql` + `db/index.ts` + `seed.ts`
-> Note: schema.sql is canonical — all migrations 001–004 included. Use for fresh Supabase project setup.
-- [ ] Migrate PostgreSQL → Supabase (export schema via schema.sql, import data, update DATABASE_URL)
-
-> **Session: phase5-auth [~60k]**
-> Context: `auth.middleware.ts` + `auth.routes.ts` + `app.config.ts` + `auth.service.ts`
-- [ ] Swap JWT/bcrypt auth → Supabase Auth (handles refresh tokens, magic link, OAuth out of the box)
-
-> **Session: phase5-rls [~30k]**
-> Context: `schema.sql` only
-- [ ] Add Row Level Security (RLS) policies to replace backend ownership checks
-
-> **Session: phase5-storage [~40k]**
-> Context: `clubs.routes.ts` + `club-profile.component.ts`
-- [ ] Club logo uploads via Supabase Storage (currently no upload UI exists)
-
-> **Session: phase5-realtime [~30k]**
-> Context: `organiser-home.component.ts`
-- [ ] Real-time signup counts on organiser dashboard via Supabase run_attendees subscription
-
-> **Session: phase5-migrations [~15k]**
-> Context: `package.json` scripts + `backend/src/db/`
-- [ ] Replace manual SQL migration files with Supabase migration tooling
+**What NOT to build:**
+- Global activity feed (Strava's moat)
+- AI individual training plans (Runna/Strava just acquired this space)
+- GPS segment leaderboards (Strava's core IP)
 
 ---
 
-## Phase 5b: Discovery Feed Infrastructure
+## 🟢 Phase 0: The "Ironclad" Baseline (Current Sprint)
+*Focus: Resolving known issues, technical debt, and securing the foundation before scaling traffic.*
 
-> Features blocked on infrastructure prerequisites — do not start until unblocked.
+**Security & Infrastructure**
+- [ ] **Role Enforcement:** Update API authorization to respect the `organizer` role in `club_members`, not just `owner`.
+- [ ] **Search Optimization:** Add PostgreSQL GIN indexing to replace `ILIKE` for scalable, instant full-text search.
+- [ ] **Strava Closure:** Implement "Disconnect Strava" (wipe tokens) and "Auto-suggest matching" logic.
+- [ ] **API & Error Hardening:** Restrict Google Maps API key referrers, and implement a global Angular ErrorBoundary to prevent white screens.
 
-> **Session: phase5b-gpx [~80k]** | BLOCKED on phase5-storage (Supabase Storage)
-> Context: `runs.routes.ts` + `create-run.component.ts` + `run-detail-dialog.component.ts`
-- [ ] GPX route upload — `gpx_url TEXT` + `static_map_url TEXT` on run_events; `POST /api/runs/:id/gpx` multipart upload to Supabase bucket; static map preview via Google Maps Static API
-
-> **Session: phase5b-photos [~60k]** | BLOCKED on phase5-storage (Supabase Storage)
-> Context: `runs.routes.ts` + `run-detail-dialog.component.ts`
-- [ ] Post-run photo recaps — new `run_photos` table; `POST /api/runs/:id/photos`; photo gallery on run detail shown after event_date
-
-> **Session: phase5b-push [~70k]** | BLOCKED on VAPID infrastructure
-> Context: `backend/src/index.ts` + `ngsw-config.json`
-- [ ] PWA push notifications — VAPID key pair, `web-push` npm package, `POST /api/push/subscribe`; standards-based (not Firebase FCM)
-
-> **Session: phase5b-offline [~18k]**
-> Context: `ngsw-config.json` + `app.routes.ts`
-- [ ] Offline run browsing — cache joined runs on login, "Saved runs" tab visible offline, queue join actions for sync on reconnect
+**Retention Foundation (New — market insert)**
+- [ ] **Week-1 Onboarding Funnel:** Location-aware post-signup flow that gets a new user to their first joined run in <60 seconds. Industry data: users active in week 1 are 80% more likely to stay 6+ months. This is the single highest-leverage retention move available before launch.
+- [ ] **Empty State Strategy:** Replace zero-results feed with a "Notify me when a run is posted near [city]" prompt — captures intent instead of bouncing users.
 
 ---
 
-## Phase 6: Growth Features
+## 🟠 Phase 1: The Social Epic (Q2 2026)
+*Focus: Turning a search tool into a daily habit by deepening participation and social features.*
 
-### Engagement
+**Runner Interaction**
+- [ ] **Run Chat:** Threaded comments per run for logistics ("I'm 5 mins late!", "Where exactly are we meeting?"). Market validated — post-run/pre-run coordination is the #1 unmet social need across all major competitors.
+- [ ] **Waitlists:** Automated waitlist queue. If a run is full and someone drops out, the next person is auto-promoted. Validated by organiser pain point research.
+- [ ] **Saved Runs:** Ability to "Bookmark" a run to track its capacity without officially joining.
+- [ ] **Pace-Based Runner Matching (New):** Surface "Runs for you" on the home feed — pace-matched runs based on the user's stated preferred pace (±30 sec/km). This is the most-cited unmet need across App Store reviews and competitor analysis. CorrerJuntos built their differentiation entirely on this. Current pace filter is an event filter; this is person-level discovery.
 
-> **Session: phase6-onboarding [~12k]**
-> Context: `docs/CODEMAPS/frontend.md` + `runs.routes.ts` + `tasks/lessons.md`
-- [ ] Onboarding flow — 3-screen skippable wizard (welcome → pace preference → distance), pre-filters discovery feed on completion
-
-> **Session: phase6-organiser-roles [~35k]**
-> Context: `clubs.routes.ts` + `club_members` schema + `create-run.component.ts`
-- [ ] Club organiser roles — non-owner members with `organizer` role can post runs under the club (backend permission + frontend UI)
-
-> **Session: phase6-email [~30k]**
-> Context: `clubs.routes.ts` only; new nodemailer/resend integration
-- [ ] Email notifications — runner gets email when a followed club posts a new run
-
-> **Session: phase6-post-run-recap [~40k]** | BLOCKED on phase5-storage (Supabase Storage)
-> Context: `organiser-home.component.ts` + `run-detail-dialog.component.ts`
-- [ ] Post-run recap — organiser posts photo + note after run date; visible on run detail
-
-> **Session: phase6-og-tags [~15k]**
-> Context: `frontend/src/index.html` + `backend/src/index.ts`
-- [ ] Shareable links — `/runs/:id` + `/clubs/:id` with Open Graph meta tags for social previews
-
-> **Session: phase6-pace-tags [~20k]**
-> Context: `home.component.ts` + `run-card.component.ts`
-> Note: `pace` and `tags` columns already exist on run_events and clubs — display only
-- [ ] Pace group + tag display on run cards and search filter UI
-
-> **Session: phase6-recurring-runs [~50k]**
-> Context: `runs.routes.ts` + `schema.sql` + `create-run.component.ts`
-- [ ] Recurring run templates — `recurrence_rule` TEXT (RRULE format) on run_events, cron job spawns instances, organiser toggle on create form
-
-> **Session: phase6-waitlist [~35k]**
-> Context: `runs.routes.ts` + `schema.sql` + `run-detail-dialog.component.ts`
-- [ ] Attendee waitlist — `waitlist_position` on run_attendees, auto-promote + notify on cancellation (max_attendees already exists on run_events)
-
-> **Session: phase6-organiser-stats [~20k]**
-> Context: `organiser-home.component.ts` + `runs.routes.ts`
-- [ ] Organiser quick-stats — attendance rate, no-show trend per run, displayed on organiser dashboard
-
-> **Session: phase6-next-run-nudge [~10k]**
-> Context: `run-detail-dialog.component.ts` + `runs.routes.ts`
-- [ ] "Next run by same club" nudge — show next scheduled club run at the bottom of run detail sheet
-
-> **Session: phase6-meeting-point [~12k]**
-> Context: `run-detail-dialog.component.ts` + `create-run.component.ts` + `runs.routes.ts`
-- [ ] Enhanced meeting point — "Open in Apple/Google Maps" deep-link on run detail; optional post-run café location field on create
-
-> **Session: phase6-kit-checklist [~15k]**
-> Context: `create-run.component.ts` + `run-detail-dialog.component.ts`
-- [ ] Kit checklist — optional gear requirements on run creation (trail shoes / water / headtorch), displayed on run detail
-
-> **Session: phase6-email-digest [~30k]**
-> Context: `clubs.routes.ts` + `runs.routes.ts`; new nodemailer/resend integration
-- [ ] Weekly email digest — "3 new runs near you this week", Friday 6pm send, user opt-out preference
-
-> **Session: phase6-inclusive-groups [~20k]**
-> Context: `docs/CODEMAPS/data.md` + `club-profile.component.ts` + `clubs.routes.ts`
-- [ ] Inclusive group settings — "Who can join" per club (open / women-only / invitation-only); private runs hidden from discovery feed
-
-### Discovery
-
-> **Session: phase6-geo-filter [~25k]**
-> Context: `home.component.ts` + `runs.routes.ts`
-- [ ] "Runs near me" radius filter on home feed (geolocation + PostGIS or Haversine)
-
-> **Session: phase6-club-search [~20k]**
-> Context: `club-list.component.ts` + `clubs.routes.ts`
-- [ ] Club search and filter by city, pace, tags
-
-> **Session: phase6-featured-clubs [~15k]**
-> Context: `home.component.ts`
-- [ ] Featured clubs section on home or clubs tab
-
-> **Session: phase6-ics-export [~15k]**
-> Context: `run-detail-dialog.component.ts` + `runs.routes.ts`
-- [ ] Calendar sync — `GET /api/runs/:id/calendar` returns ICS file; "Add to Calendar" button on run detail
-
-### Social Proof
-
-> **Session: phase6-attendance-stats [~20k]**
-> Context: `club-profile.component.ts` + `run-card.component.ts` + `clubs.routes.ts`
-- [ ] Run attendance count visible on club profile
-- [ ] "X people going" live badge on run cards
-
-> **Session: phase6-completion-rate [~10k]**
-> Context: `run-card.component.ts` + `runs.routes.ts` + `organiser-home.component.ts`
-- [ ] Run completion rate — backend calculates attended/RSVPed %, displayed on run cards and organiser dashboard
-
-> **Session: phase6-verification-badge [~10k]**
-> Context: `clubs.routes.ts` + `club-profile.component.ts` + `docs/CODEMAPS/data.md`
-- [ ] Organiser verification badge — auto-awarded after 10 runs + 90% completion rate + zero reports; shown on club profile and run cards
-
-> **Session: phase6-ratings [~25k]**
-> Context: `run-detail-dialog.component.ts` + `runs.routes.ts` + `docs/CODEMAPS/data.md`
-- [ ] Organiser star ratings — runner rates run after event_date (1–5 stars + optional comment); aggregate shown on organiser profile
-
-> **Session: phase6-post-run-share [~25k]**
-> Context: `run-detail-dialog.component.ts` + `run-card.component.ts`
-> Note: Web Share API already wired
-- [ ] Post-run share card — canvas-generated image (run name, distance, attendee count, KLUB branding) shared via Web Share API
-
-### Social
-
-> **Session: phase6-profile-visibility [~25k]**
-> Context: `docs/CODEMAPS/data.md` + `runner-profile.component.ts` + `runs.routes.ts`
-- [ ] Profile visibility controls — private/friends/public toggle (default: friends-only); affects run history, pace, upcoming runs
-
-> **Session: phase6-block-report [~15k]**
-> Context: `docs/CODEMAPS/data.md` + `runner-profile.component.ts` + `runs.routes.ts`
-- [ ] Block + report — block runner (hides from discovery + attendee lists); report run (flags to admin); new `user_blocks` table
-
-> **Session: phase6-follow [~45k]**
-> Context: `schema.sql` + `runner-profile.component.ts`
-- [ ] Social graph / follow friends — new `user_follows` table; followed clubs/runners surface in feed
-
-> **Session: phase6-milestones [~25k]**
-> Context: `runner-profile.component.ts` + `runs.routes.ts`
-- [ ] Milestones and gamification — `runs_joined_count` on users, achievement badges (first run, 10 runs, 50km etc.)
-
-> **Session: phase6-qr [~20k]**
-> Context: `run-detail-dialog.component.ts` + `runs.routes.ts`
-- [ ] QR code check-ins — `GET /api/runs/:id/qr` returns SVG QR code; organisers only; scan confirms attendance
-
-### Algorithmic
-
-> **Session: phase6-algo [~50k]** | DEFER — needs 3–6 months of post-launch data
-> Context: `runs.routes.ts` + `schema.sql`; requires pgvector on Supabase
-- [ ] Pace-based run recommendations — embed user run history, recommend runs by similarity
-
-### Integrations
-
-> **Session: phase6-strava [~60k]**
-> Context: `run-detail-dialog.component.ts` + `runner-profile.component.ts` + `runs.routes.ts`
-- [ ] Strava integration — link a Strava activity to a posted KLUB run; show stats on run detail
-
-> **Session: phase6-apple-google-fit [~60k]** | DEFER
-- [ ] Apple Health / Google Fit — stretch goal, deferred post-Strava
+**Profiles & Identity**
+- [ ] **Social Graph:** Follow friends and verified club leaders. Adds a "Mutual Clubs" intersection display on profiles.
+- [ ] **Privacy "Ghost Zones":** Allow users to automatically obscure the first/last 500m of their GPS polylines to protect home addresses.
+- [ ] **Post-Run Gallery:** Organizers and attendees can upload 3-5 "Recap Photos" to a completed run's page. Emerging trend — no major competitor has implemented post-run social engagement well.
 
 ---
 
-## Phase 7: Monetisation
+## 🔵 Phase 2: The "Pro Organizer" Suite (Q3 2026)
+*Focus: Providing advanced tools that make KLUB indispensable for club leaders. This is the monetisation foundation.*
 
-> **Session: phase7-freemium [~40k]**
-> Context: `runs.routes.ts` + `organiser-home.component.ts`
-- [ ] Freemium model — free tier (limited runs/month per organiser) + KLUB Plus badge
+**Event Automation**
+- [ ] **Recurring Runs:** RRULE support for creating templated runs (e.g., auto-spawning "Tuesday Track Night"). Massive friction reducer — WhatsApp groups currently do this job for most club organisers.
+- [ ] **Club Route Library:** Allow organizers to save and reuse standard GPX routes directly from their club profile.
+- [ ] **Digital Waivers:** Add a required liability checkbox flow for users joining specific high-risk or club-mandated runs.
 
-> **Session: phase7-stripe [~80k]**
-> Context: `auth.routes.ts` + users schema + `organiser-home.component.ts`
-- [ ] Stripe integration — organiser subscription billing, webhook handling, subscription status on users table
+**Management & Analytics**
+- [ ] **QR Check-in:** A scanning mode for organizers to instantly verify attendance at the start line. Actively monetised by ClubPal and Teamer — validates willingness to pay.
+- [ ] **Organizer Analytics:** Dashboards showing attendance rates, no-show trends, and member retention.
+- [ ] **Calendar Sync:** One-tap ICS export ("Add to Apple/Google Calendar").
+- [ ] **Event Payment Processing (New):** Allow organisers to charge for specific runs (charity 5Ks, coached sessions). KLUB takes a small platform fee. RunSignUp processes $400M/yr this way for races — the model is proven. Unlocks ticketed events and legitimises clubs as organised entities.
 
-> **Session: phase7-boosts [~35k]**
-> Context: `home.component.ts` + `runs.routes.ts` + `map-view.component.ts`
-- [ ] Featured run boosts — paid placement on home feed and map view
+**Monetization Launch**
+- [ ] **Club Plans ($39.99–$99.99/mo):** Gated behind Phase 2 features — multi-admin, analytics, payment processing, bulk messaging. This is the primary revenue driver.
+- [ ] **KLUB Premium ($9.99/mo):** Individual runner tier — pace matching priority, saved run history, advanced profile stats.
 
 ---
 
-## Tooling & Process
+## 🟣 Phase 3: The Scaling Epic (Q4 2026)
+*Focus: Transitioning to serverless, real-time architecture for massive scale.*
 
-> **Session: tooling-sentry [~25k]**
-> Context: `frontend/src/app/app.config.ts` + `backend/src/index.ts`
-- [ ] Sentry error monitoring on frontend + backend (should land before public launch)
+**Supabase Migration**
+- [ ] **Real-Time Subscriptions:** Migrate DB to Supabase. Chat messages, waitlist updates, and sign-up counts update instantly via WebSockets without refreshing.
+- [ ] **Auth Swap:** Replace custom JWT/bcrypt with Supabase Auth (enabling frictionless Magic Links and native OAuth).
+- [ ] **Edge Storage:** Move Base64 image strings from the DB to Supabase Storage Buckets for CDN-backed speed.
 
-> **Session: tooling-analytics [~20k]**
-> Context: `frontend/src/index.html` + `frontend/src/app/app.config.ts`
-- [ ] Analytics — PostHog or Plausible (privacy-friendly, no cookie banner needed)
+**Automated Syncing**
+- [ ] **Strava Webhooks:** Activate the webhook listener to sync linked activities silently in the background.
+- [ ] **Push Notifications:** VAPID-based browser/mobile notifications for "Run starting in 1 hour" and "Waitlist Promotion."
 
-> **Session: tooling-a11y [~20k]**
-> Context: `app.component.ts` + `run-card.component.ts` + `run-detail-dialog.component.ts`
-- [ ] Accessibility audit + fixes — aria-labels on interactive elements, WCAG AA contrast check (primary green is borderline), keyboard nav, large text mode via CSS custom property
+**Local Leaderboards & Challenges (New)**
+- [ ] **Club Challenges:** Weekly/monthly distance or attendance challenges within a club. Market data shows local/peer leaderboards drive higher engagement than global rankings — Strava's version is shallow.
+- [ ] **Neighbourhood Leaderboards:** City-scoped run counts visible on the map view — drives FOMO and local discovery.
 
-> **Session: tooling-linear [~5k]** | Before Phase 6
-> Context: `tasks/todo.md` + `tasks/roadmap.md`
-- [ ] Migrate task tracking from todo.md → Linear before Phase 6 scope grows too large
+---
 
-- [ ] **Mobbin** — design reference for UI patterns (external tool, no code changes)
+## ⚪ Phase 4: Ecosystem & Monetization (2027)
+*Focus: Business sustainability and broader fitness integration.*
+
+**Expansion**
+- [ ] **Garmin / Apple Health:** Native integrations for runners outside the Strava ecosystem. Competitive necessity by 2026–2027 per trend data.
+- [ ] **Weekly Digest:** Automated SendGrid email: "3 runs happening near you this weekend."
+
+**Monetization**
+- [ ] **Verified Club Subscriptions:** Small monthly Stripe fee for clubs to access advanced analytics, bulk-messaging, and "Featured" placement.
+- [ ] **Ticketed Events:** Allow organizers to host paid runs (e.g., charity 5Ks) with KLUB taking a small platform fee.
+- [ ] **KLUB Plus:** Optional runner subscription for personal training heatmaps, dark mode customizations, and "Pro" profile badges.
+
+---
+
+## ⚠️ Competitive Risk Register
+
+| Risk | Likelihood | Impact | Mitigation |
+|---|---|---|---|
+| Strava ships group run scheduling | Medium — they're aware of the gap; just acquired Runna | High | Speed to market; own the organiser relationship before they move |
+| PWA install rate ceiling vs native apps | High — fitness apps lean on App Store distribution | Medium | Monitor install-to-retain ratio; evaluate native wrapper at Phase 3 |
+| Network effects require local density | High — a city with 3 runs listed is worthless | High | Launch city strategy; seed with existing run clubs before opening self-serve |
+| Freemium conversion stays at 2–3% | Medium — industry norm | Medium | Volume through viral loop matters more than conversion rate at this stage |
+
+---
+
+## 🛠 Tooling & DevOps Strategy
+- **Monitoring:** Sentry (Real-time crash reporting for Angular and Node).
+- **Analytics:** PostHog (Tracking feature adoption — Map vs. List views, onboarding funnel drop-off, pace match CTR).
+- **Workflow:** Migrate task tracking to **Linear** once the contributor count exceeds 2.
+
+---
+
+## Monetization Model Summary
+
+| Tier | Price | Gate |
+|---|---|---|
+| Free | $0 | Run discovery, RSVP, basic profile |
+| KLUB Premium | $9.99/mo | Pace matching priority, run history, advanced stats |
+| Club Plan | $39.99–$99.99/mo | Multi-admin, analytics, payment processing, bulk messaging |
+| Platform fee | ~5% per ticketed event | Ticketed runs (Phase 4) |
+
+*Sweet spot validated by market: Strava ($11.99/mo individual), RunSignUp (transaction %). Freemium conversion in fitness averages 2–3% — viral free tier is the growth engine, Club Plans are the revenue engine.*
